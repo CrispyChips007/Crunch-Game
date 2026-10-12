@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#15271f">
+  <meta name="description" content="Crunch — a fast, strategic five-dice score challenge.">
+  <title>Crunch — Dice Game</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script>
+    if (location.protocol === "file:") {
+      addEventListener("DOMContentLoaded", () => {
+        const message = document.querySelector("#message");
+        const start = document.querySelector("#roll");
+        if (message) message.textContent = "Crunch must be opened through a local web server, not as a file.";
+        if (start) {
+          start.disabled = true;
+          start.textContent = "Local server required";
+          start.title = "Run python -m http.server 8080, then open http://localhost:8080";
+        }
+      });
+    }
+  </script>
+</head>
+<body>
+  <div class="ad ad-header" data-ad-slot="header" aria-label="Advertisement"></div>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="Crunch home"><span>CR</span>UNCH</a>
+    <nav><button class="text-button" data-open="how">How to play</button><button class="text-button" data-open="stats">Stats</button></nav>
+  </header>
+  <main class="layout">
+    <section class="game-card" aria-labelledby="game-heading">
+      <div id="crunch-effect" class="crunch-effect" aria-hidden="true"><strong>CRUNCH!</strong></div>
+      <div id="turn-indicator" class="turn-indicator" aria-hidden="true"><strong></strong></div>
+      <h1 id="game-heading" class="sr-only">Crunch dice game</h1>
+      <div class="mode-switch" aria-label="Game mode"><button data-mode="practice" class="active">Practice</button><button data-mode="computer">Vs Computer</button></div>
+      <div id="players" class="players" hidden></div>
+      <div class="scoreboard">
+        <div><span>Total score</span><strong id="total-score">0</strong></div>
+        <div class="target"><span>Target</span><strong id="target-score">10,000</strong></div>
+        <div><span id="turn-label">Turn</span><strong id="turn-count">1</strong></div>
+      </div>
+      <div class="turn-panel">
+        <span>Unbanked points</span><strong id="turn-score">0</strong><small id="selection-score">No dice selected</small>
+      </div>
+      <div id="dice" class="dice" aria-label="Dice"></div>
+      <div id="combo-actions" class="combo-actions"></div>
+      <p id="message" class="message" aria-live="polite">Roll the dice to begin.</p>
+      <div class="controls">
+        <button id="roll" class="primary">Start game</button>
+        <button id="bank" class="secondary" disabled>Bank</button>
+      </div>
+      <button id="restart" class="restart">Restart game</button>
+    </section>
+    <aside class="ad ad-sidebar" data-ad-slot="sidebar" aria-label="Advertisement"></aside>
+  </main>
+  <div class="ad ad-below" data-ad-slot="below" aria-label="Advertisement"></div>
+  <footer>Five dice. One choice at a time. <span aria-hidden="true">◆</span> Crunch</footer>
+
+  <dialog id="intro"><div class="modal-art">⚄</div><h2>Welcome to Crunch</h2><p>Pick scoring dice, then bank safely or risk another roll. Reach 10,000 in as few turns as you can—but a roll with no score is a Crunch.</p><button class="primary" data-close="intro">Let’s roll</button></dialog>
+  <dialog id="how" class="how-dialog">
+    <h2>How to play</h2>
+    <ol class="play-steps">
+      <li><b>Roll</b> all available dice.</li>
+      <li><b>Select</b> at least one scoring die.</li>
+      <li><b>Risk it:</b> roll the remaining dice to earn more points, or <b>Bank</b> to end your turn and add your unbanked points to your total.</li>
+    </ol>
+    <h3>Scoring dice</h3>
+    <div class="score-guide">
+      <div><span>Single</span><span class="dice-example" data-faces="5" aria-label="five"></span><b>50</b></div>
+      <div><span>Single</span><span class="dice-example" data-faces="1" aria-label="one"></span><b>100</b></div>
+      <div><span>Triple</span><span class="dice-example" data-faces="222" aria-label="three twos"></span><b>200</b></div>
+      <div><span>Triple</span><span class="dice-example" data-faces="333" aria-label="three threes"></span><b>300</b></div>
+      <div><span>Triple</span><span class="dice-example" data-faces="444" aria-label="three fours"></span><b>400</b></div>
+      <div><span>Triple</span><span class="dice-example" data-faces="555" aria-label="three fives"></span><b>500</b></div>
+      <div><span>Triple</span><span class="dice-example" data-faces="666" aria-label="three sixes"></span><b>600</b></div>
+      <div><span>Triple</span><span class="dice-example" data-faces="111" aria-label="three ones"></span><b>1,000</b></div>
+    </div>
+    <ul class="rule-notes">
+      <li>To add points to your total for the first time, you must earn and Bank at least <b>1,000 points in one turn</b>. After that, you may Bank any amount.</li>
+      <li>A roll with no scoring dice is a <b>Crunch</b>. You lose every unbanked point from that turn.</li>
+      <li>If all five dice score, you may roll again with all five dice.</li>
+    </ul>
+    <label class="toggle"><input id="scoring-help" type="checkbox"> Show subtle scoring hints</label>
+    <button class="secondary" data-close="how">Close</button>
+  </dialog>
+  <dialog id="stats"><h2>Your stats</h2><div id="stats-content" class="stats-grid"></div><button class="secondary" data-close="stats">Close</button></dialog>
+  <dialog id="win"><div class="modal-art">★</div><h2 id="win-title">You crunched it!</h2><div id="win-copy"></div><button id="new-game" class="primary">Play again</button></dialog>
+  <script type="module" src="./src/app.js"></script>
+</body>
+</html>
