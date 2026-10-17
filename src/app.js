@@ -1,6 +1,6 @@
 import { AD_CONFIG, GAME_CONFIG, RANKS, UI_TIMING } from "./config.js";
 import { bank, canAct, createGame, roll, selectionResult, toggleSelection, toggleTriple } from "./engine.js";
-import { bestComputerSelection, chooseComputerAction } from "./computer.js";
+import { bestComputerSelection, chooseComputerAction, maximumComputerSelection } from "./computer.js";
 import { createComputerMatch, matchBank, matchRoll } from "./match.js";
 import { renderAds } from "./ads.js";
 import { clearGame, loadGame, loadPrefs, loadStats, recordBank, recordCrunch, recordWin, saveGame, savePrefs, saveStats } from "./storage.js";
@@ -146,7 +146,15 @@ async function scheduleComputerTurn() {
     render(); await pause(UI_TIMING.computerSelectionPauseMs);
     const player = state.players[1];
     const action = chooseComputerAction({ opened: player.opened, unbankedPoints: state.turnScore + choice.score, diceRemaining: state.config.diceCount - state.retainedCount - choice.indices.length || state.config.diceCount, totalScore: player.score, opponentScore: state.players[0].score }, state.config);
-    if (action === "bank") { state = matchBank(state); render(); showTurnIndicator(); break; }
+    if (action === "bank") {
+      const bankSelection = maximumComputerSelection(state.dice);
+      if (bankSelection && bankSelection.indices.join(",") !== state.selected.join(",")) {
+        state = { ...state, selected: bankSelection.indices, message: `Crunchy banks every available point: ${bankSelection.score.toLocaleString()}.` };
+        render();
+        await pause(UI_TIMING.computerSelectionPauseMs);
+      }
+      state = matchBank(state); render(); showTurnIndicator(); break;
+    }
     state = matchRoll(state); render();
     if (state.activePlayer !== 1) {
       await pause(UI_TIMING.crunchRevealMs);

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bestComputerSelection, chooseComputerAction } from "../src/computer.js";
+import { bestComputerSelection, chooseComputerAction, maximumComputerSelection } from "../src/computer.js";
 import { createComputerMatch, matchBank, matchRoll } from "../src/match.js";
 
 const roller = (values) => { let i=0; return () => values[i++]; };
@@ -14,7 +14,15 @@ test("computer banking is primarily biased by dice remaining", () => {
   assert.equal(chooseComputerAction({...common,diceRemaining:5}),"roll");
 });
 test("computer selection favors points per retained die", () => {
-  assert.deepEqual(bestComputerSelection([2,2,2,1,5]),{indices:[3],score:100});
+  assert.deepEqual(bestComputerSelection([2,2,2,1,4]),{indices:[3],score:100});
+});
+test("computer takes every die when all remaining dice score", () => {
+  assert.deepEqual(bestComputerSelection([1,5]),{indices:[0,1],score:150});
+  assert.deepEqual(bestComputerSelection([2,2,2,1,5]),{indices:[0,1,2,3,4],score:350});
+});
+test("computer banks every available scoring point", () => {
+  assert.deepEqual(maximumComputerSelection([1,1,1,1]),{indices:[0,1,2,3],score:1100});
+  assert.deepEqual(maximumComputerSelection([1,5,2,3]),{indices:[0,1],score:150});
 });
 test("match alternates after a Crunch and preserves the roll", () => {
   let state=createComputerMatch();
