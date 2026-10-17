@@ -9,7 +9,14 @@ import { scoringOptions } from "./scoring.js";
 const $ = (selector) => document.querySelector(selector);
 document.documentElement.style.setProperty("--crunch-animation-ms", `${UI_TIMING.crunchAnimationMs}ms`);
 document.documentElement.style.setProperty("--turn-indicator-ms", `${UI_TIMING.turnIndicatorMs}ms`);
-let state = loadGame() || createComputerMatch();
+function hasGameProgress(game) {
+  if (!game) return false;
+  if (game.dice?.length || game.totalScore || game.turnScore || game.retainedCount || game.turnCount > 1) return true;
+  return Boolean(game.players?.some((player) => player.score || player.turns));
+}
+
+const savedGame = loadGame();
+let state = hasGameProgress(savedGame) ? savedGame : createComputerMatch();
 state.config = GAME_CONFIG;
 // Repair games saved before the ended-turn flag was introduced.
 if (state.message?.startsWith("Crunch!")) {
@@ -54,7 +61,8 @@ function render() {
   $("#bank").title = actionable && !meetsOpeningRequirement ? `You need ${state.config.openingRequirement.toLocaleString()} points to open.` : "";
   $("#roll").disabled = !humanTurn || computerBusy || Boolean(state.dice.length && !actionable && !state.awaitingNextTurn);
   $("#roll").textContent = state.awaitingNextTurn ? "Roll dice" : (state.dice.length ? "Roll again" : (state.turnCount === 1 && state.totalScore === 0 ? "Start game" : "Roll dice"));
-  if (state.status === "playing") saveGame(state);
+  if (state.status === "playing" && hasGameProgress(state)) saveGame(state);
+  else if (state.status === "playing") clearGame();
 }
 
 function doRoll() {
