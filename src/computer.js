@@ -24,6 +24,12 @@ export function maximumComputerSelection(dice) {
   return scoringSelections(dice).sort((a, b) => b.score - a.score || b.indices.length - a.indices.length)[0] || null;
 }
 
+export function chooseComputerSelection(dice, { opened, turnScore, openingRequirement = GAME_CONFIG.openingRequirement }) {
+  const maximum = maximumComputerSelection(dice);
+  if (!opened && maximum && turnScore + maximum.score >= openingRequirement) return maximum;
+  return bestComputerSelection(dice);
+}
+
 export function chooseComputerAction(publicState, config = GAME_CONFIG) {
   const { opened, unbankedPoints, diceRemaining, totalScore, opponentScore } = publicState;
   if (!opened) return unbankedPoints >= config.openingRequirement ? "bank" : "roll";

@@ -1,6 +1,6 @@
 # Crunch
 
-Crunch is a lightweight, mobile-first five-dice score challenge inspired by Farkle. The current solo challenge is retained as **Practice mode**. It has no accounts, build step, external assets, or runtime dependencies and is ready for static hosting.
+Crunch is a lightweight, mobile-first five-dice score challenge inspired by Farkle. **Vs Crunchy** is the default experience, while the solo score challenge remains available as **Practice mode**. It has no accounts, build step, external assets, or runtime dependencies and is ready for static hosting.
 
 ## Play locally
 

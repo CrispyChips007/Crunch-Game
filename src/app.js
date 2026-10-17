@@ -1,6 +1,6 @@
 import { AD_CONFIG, GAME_CONFIG, RANKS, UI_TIMING } from "./config.js";
 import { bank, canAct, createGame, roll, selectionResult, toggleSelection, toggleTriple } from "./engine.js";
-import { bestComputerSelection, chooseComputerAction, maximumComputerSelection } from "./computer.js";
+import { chooseComputerAction, chooseComputerSelection, maximumComputerSelection } from "./computer.js";
 import { createComputerMatch, matchBank, matchRoll } from "./match.js";
 import { renderAds } from "./ads.js";
 import { clearGame, loadGame, loadPrefs, loadStats, recordBank, recordCrunch, recordWin, saveGame, savePrefs, saveStats } from "./storage.js";
@@ -9,7 +9,7 @@ import { scoringOptions } from "./scoring.js";
 const $ = (selector) => document.querySelector(selector);
 document.documentElement.style.setProperty("--crunch-animation-ms", `${UI_TIMING.crunchAnimationMs}ms`);
 document.documentElement.style.setProperty("--turn-indicator-ms", `${UI_TIMING.turnIndicatorMs}ms`);
-let state = loadGame() || createGame();
+let state = loadGame() || createComputerMatch();
 state.config = GAME_CONFIG;
 // Repair games saved before the ended-turn flag was introduced.
 if (state.message?.startsWith("Crunch!")) {
@@ -140,7 +140,8 @@ async function scheduleComputerTurn() {
       }
       await pause(UI_TIMING.computerRollPauseMs);
     }
-    const choice = bestComputerSelection(state.dice);
+    const currentComputer = state.players[1];
+    const choice = chooseComputerSelection(state.dice, { opened: currentComputer.opened, turnScore: state.turnScore, openingRequirement: state.config.openingRequirement });
     if (!choice) break;
     state = { ...state, selected: choice.indices, message: `Crunchy selects ${choice.score.toLocaleString()} points.` };
     render(); await pause(UI_TIMING.computerSelectionPauseMs);

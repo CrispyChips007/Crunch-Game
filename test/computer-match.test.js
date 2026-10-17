@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bestComputerSelection, chooseComputerAction, maximumComputerSelection } from "../src/computer.js";
+import { bestComputerSelection, chooseComputerAction, chooseComputerSelection, maximumComputerSelection } from "../src/computer.js";
 import { createComputerMatch, matchBank, matchRoll } from "../src/match.js";
 
 const roller = (values) => { let i=0; return () => values[i++]; };
@@ -23,6 +23,10 @@ test("computer takes every die when all remaining dice score", () => {
 test("computer banks every available scoring point", () => {
   assert.deepEqual(maximumComputerSelection([1,1,1,1]),{indices:[0,1,2,3],score:1100});
   assert.deepEqual(maximumComputerSelection([1,5,2,3]),{indices:[0,1],score:150});
+});
+test("computer takes all points that satisfy its opening requirement", () => {
+  assert.deepEqual(chooseComputerSelection([1,5], { opened:false, turnScore:850 }), {indices:[0,1],score:150});
+  assert.deepEqual(chooseComputerSelection([1,5,3], { opened:false, turnScore:850 }), {indices:[0,1],score:150});
 });
 test("match alternates after a Crunch and preserves the roll", () => {
   let state=createComputerMatch();
