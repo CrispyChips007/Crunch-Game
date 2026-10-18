@@ -17,6 +17,7 @@ nav { display:flex; gap:6px }.text-button,.restart { color:var(--muted); backgro
 .dice { --dice-gap:clamp(5px,2vw,14px); width:100%; min-height:108px; display:flex; align-items:center; justify-content:center; gap:var(--dice-gap); }
 .die { position:relative; width:clamp(44px,calc((100% - (4 * var(--dice-gap))) / 5),88px); min-width:0; aspect-ratio:1; flex:0 1 auto; background:#f8f4e9; border:3px solid transparent; border-radius:18%; cursor:pointer; transition:transform .16s,border-color .16s; padding:0; }
 .die:hover { transform:translateY(-3px) }.die.selected{transform:translateY(-10px);border-color:var(--lime)}.die.hint:not(.selected){outline:3px solid #d7ff6444;outline-offset:2px}
+.die:disabled{opacity:1;cursor:default}.die:disabled:hover{transform:none}
 .die i { position:absolute; z-index:2; width:18%; aspect-ratio:1; border-radius:50%; background:#173126; transform:translate(-50%,-50%); pointer-events:none }
 .face-1 i:nth-child(1){left:50%;top:50%}
 .face-2 i:nth-child(1),.face-3 i:nth-child(1){left:28%;top:28%}.face-2 i:nth-child(2),.face-3 i:nth-child(3){left:72%;top:72%}.face-3 i:nth-child(2){left:50%;top:50%}

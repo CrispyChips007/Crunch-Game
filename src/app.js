@@ -47,8 +47,9 @@ function render() {
   $("#selection-score").textContent = selectedScore ? `${selectedScore.toLocaleString()} from selected dice` : "No dice selected";
   $("#message").textContent = state.message;
   const scoring = new Set(scoringOptions(state.dice).flatMap((option) => option.indices));
-  $("#dice").innerHTML = state.dice.map((face, index) => `<button class="die face-${face}${state.selected.includes(index) ? " selected" : ""}${prefs.scoringHelp && scoring.has(index) ? " hint" : ""}" data-die="${index}" aria-label="Die ${index + 1}: ${face}${state.selected.includes(index) ? ", selected" : ""}">${dots(face)}</button>`).join("");
-  const triples = [1, 5].filter((face) => state.dice.filter((d) => d === face).length >= 3);
+  const canSelectDice = state.status === "playing" && !state.awaitingNextTurn && (!isComputerMatch || state.activePlayer === 0) && !computerBusy;
+  $("#dice").innerHTML = state.dice.map((face, index) => `<button class="die face-${face}${state.selected.includes(index) ? " selected" : ""}${prefs.scoringHelp && scoring.has(index) ? " hint" : ""}" data-die="${index}" aria-label="Die ${index + 1}: ${face}${state.selected.includes(index) ? ", selected" : ""}"${canSelectDice ? "" : " disabled"}>${dots(face)}</button>`).join("");
+  const triples = canSelectDice ? [1, 5].filter((face) => state.dice.filter((d) => d === face).length >= 3) : [];
   $("#combo-actions").innerHTML = triples.map((face) => `<button data-triple="${face}">Select three ${face}s · ${face === 1 ? "1,000" : "500"}</button>`).join("");
   const actionable = canAct(state);
   const activeOpened = isComputerMatch ? state.players[state.activePlayer].opened : state.opened;
