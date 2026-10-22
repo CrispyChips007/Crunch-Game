@@ -74,8 +74,9 @@ function render() {
   const diceOwner = isComputerMatch && state.dice.length
     ? (state.awaitingNextTurn ? (state.activePlayer === 0 ? 1 : 0) : state.activePlayer)
     : 0;
-  $("#dice").classList.toggle("crunchy-dice", diceOwner === 1);
-  $("#dice").setAttribute("aria-label", diceOwner === 1 ? "Crunchy's dice" : "Dice");
+  const crunchyDiceEnded = diceOwner === 1 && state.awaitingNextTurn;
+  $("#dice").classList.toggle("crunchy-dice-ended", crunchyDiceEnded);
+  $("#dice").setAttribute("aria-label", crunchyDiceEnded ? "Crunchy's previous dice" : (diceOwner === 1 ? "Crunchy's dice" : "Dice"));
   $("#dice").innerHTML = state.dice.map((face, index) => `<button class="die face-${face}${state.selected.includes(index) ? " selected" : ""}${prefs.scoringHelp && scoring.has(index) ? " hint" : ""}" data-die="${index}" aria-label="Die ${index + 1}: ${face}${state.selected.includes(index) ? ", selected" : ""}"${canSelectDice ? "" : " disabled"}>${dots(face)}</button>`).join("");
   const triples = canSelectDice ? [1, 5].filter((face) => state.dice.filter((d) => d === face).length >= 3) : [];
   $("#combo-actions").innerHTML = triples.map((face) => `<button data-triple="${face}">Select three ${face}s · ${face === 1 ? "1,000" : "500"}</button>`).join("");
@@ -96,6 +97,7 @@ function render() {
 }
 
 function doRoll() {
+  if (crunchBusy || computerBusy) return;
   if (state.mode === "computer" && !state.openingRevealed) {
     showOpeningRollSequence();
     return;
@@ -227,6 +229,7 @@ async function showOpeningRollSequence() {
 }
 
 function doBank() {
+  if (crunchBusy || computerBusy) return;
   const previous = state;
   const beforePlayer = state.activePlayer;
   state = state.mode === "computer" ? matchBank(state) : bank(state);
@@ -341,8 +344,8 @@ function beginComputerTurnIfNeeded() {
   if (state.mode === "computer" && state.openingRevealed && state.activePlayer === 1 && state.status === "playing") scheduleComputerTurn();
 }
 
-$("#dice").addEventListener("click", (event) => { const button = event.target.closest("[data-die]"); if (button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleSelection(state, Number(button.dataset.die)); render(); } });
-$("#combo-actions").addEventListener("click", (event) => { const button = event.target.closest("[data-triple]"); if (button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleTriple(state, Number(button.dataset.triple)); render(); } });
+$("#dice").addEventListener("click", (event) => { const button = event.target.closest("[data-die]"); if (!crunchBusy && !computerBusy && button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleSelection(state, Number(button.dataset.die)); render(); } });
+$("#combo-actions").addEventListener("click", (event) => { const button = event.target.closest("[data-triple]"); if (!crunchBusy && !computerBusy && button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleTriple(state, Number(button.dataset.triple)); render(); } });
 $("#roll").addEventListener("click", doRoll);
 $("#bank").addEventListener("click", doBank);
 $("#restart").addEventListener("click", () => { if (confirm("Abandon this game and start again?")) { stats.abandoned += 1; saveStats(stats); state = state.mode === "computer" ? createComputerMatch() : { ...createGame(), mode: "practice" }; computerBusy = false; render(); beginComputerTurnIfNeeded(); } });
