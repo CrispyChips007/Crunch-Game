@@ -27,7 +27,10 @@ let stats = loadStats();
 let prefs = loadPrefs();
 let bestRun = loadBestRun();
 let computerBusy = false;
-const crunchHandoffDelay = UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs;
+let crunchMeterOverride = null;
+let pendingCrunchStreak = null;
+let crunchMarkSlam = false;
+const crunchHandoffDelay = UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs + UI_TIMING.crunchSettleMs;
 
 function rankFor(completed) { return RANKS.find(([threshold]) => completed >= threshold)[1]; }
 function dots(face) { return Array.from({ length: face }, () => "<i></i>").join(""); }
@@ -38,8 +41,8 @@ function render() {
   const humanScore = isComputerMatch ? state.players[0].score : state.totalScore;
   $("#score-label").textContent = isComputerMatch ? "Target" : "Total score";
   $("#score-value").textContent = (isComputerMatch ? state.config.winningTarget : humanScore).toLocaleString();
-  const activeCrunchStreak = isComputerMatch ? (state.players[state.activePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0);
-  $("#crunch-count").innerHTML = Array.from({ length: activeCrunchStreak }, () => `<i class="crunch-mark"><b>CR</b>UNCH</i>`).join("");
+  const activeCrunchStreak = crunchMeterOverride ?? (isComputerMatch ? (state.players[state.activePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0));
+  $("#crunch-count").innerHTML = Array.from({ length: activeCrunchStreak }, (_, index) => `<i class="crunch-mark${crunchMarkSlam && index === activeCrunchStreak - 1 ? " slam-in" : ""}"><b>CR</b>UNCH</i>`).join("");
   $(".crunch-meter").setAttribute("aria-label", `${activeCrunchStreak} consecutive ${activeCrunchStreak === 1 ? "Crunch" : "Crunches"}`);
   $("#turn-label").textContent = isComputerMatch ? "Round" : "Turn";
   $("#turn-count").textContent = isComputerMatch ? state.round : state.turnCount;
@@ -92,21 +95,29 @@ function doRoll() {
     return;
   }
   const beforePlayer = state.activePlayer;
+  const previousCrunchStreak = state.mode === "computer" ? (state.players[beforePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0);
   state = state.mode === "computer" ? matchRoll(state) : roll(state);
   const crunched = state.lastEvent === "crunch" || state.lastEvent === "triple-crunch";
+  if (crunched) prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : (state.mode === "computer" ? state.players[beforePlayer].crunchStreak : state.crunchStreak));
   if (state.mode === "practice" && crunched) state = { ...state, scoreHistory: [...(state.scoreHistory ?? []), state.totalScore] };
   if (crunched) { stats = recordCrunch(stats); saveStats(stats); }
   render();
   if (crunched) setTimeout(playCrunchEffect, UI_TIMING.crunchRevealMs);
   if (state.mode === "computer" && state.activePlayer !== beforePlayer && state.status === "playing") {
-    if (crunched) setTimeout(showTurnIndicator, crunchHandoffDelay); else showTurnIndicator();
+    if (crunched) setTimeout(() => { clearCrunchMeterOverride(); showTurnIndicator(); }, crunchHandoffDelay); else showTurnIndicator();
   }
   if (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
     if (crunched) setTimeout(scheduleComputerTurn, crunchHandoffDelay); else scheduleComputerTurn();
   }
+  if (state.mode === "practice" && crunched) setTimeout(clearCrunchMeterOverride, crunchHandoffDelay);
 }
 
 function playCrunchEffect() {
+  if (pendingCrunchStreak !== null) {
+    crunchMeterOverride = pendingCrunchStreak;
+    crunchMarkSlam = true;
+    render();
+  }
   const card = $(".game-card");
   const effect = $("#crunch-effect");
   card.classList.remove("is-crunching");
@@ -118,6 +129,19 @@ function playCrunchEffect() {
     card.classList.remove("is-crunching");
     effect.classList.remove("active");
   }, { once: true });
+}
+
+function prepareCrunchMeter(previousStreak, nextStreak) {
+  crunchMeterOverride = previousStreak;
+  pendingCrunchStreak = nextStreak;
+  crunchMarkSlam = false;
+}
+
+function clearCrunchMeterOverride() {
+  crunchMeterOverride = null;
+  pendingCrunchStreak = null;
+  crunchMarkSlam = false;
+  render();
 }
 
 function showTurnIndicator() {
@@ -196,11 +220,15 @@ async function scheduleComputerTurn() {
   computerBusy = true; render(); await pause(openingDelay);
   while (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
     if (state.awaitingNextTurn || !state.dice.length) {
+      const previousCrunchStreak = state.players[1].crunchStreak ?? 0;
       state = matchRoll(state); render();
       if (state.activePlayer !== 1) {
+        prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak);
+        render();
         await pause(UI_TIMING.crunchRevealMs);
         playCrunchEffect();
-        await pause(UI_TIMING.crunchAnimationMs);
+        await pause(UI_TIMING.crunchAnimationMs + UI_TIMING.crunchSettleMs);
+        clearCrunchMeterOverride();
         showTurnIndicator();
         break;
       }
@@ -222,11 +250,15 @@ async function scheduleComputerTurn() {
       }
       state = matchBank(state); render(); showTurnIndicator(); break;
     }
+    const previousCrunchStreak = state.players[1].crunchStreak ?? 0;
     state = matchRoll(state); render();
     if (state.activePlayer !== 1) {
+      prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak);
+      render();
       await pause(UI_TIMING.crunchRevealMs);
       playCrunchEffect();
-      await pause(UI_TIMING.crunchAnimationMs);
+      await pause(UI_TIMING.crunchAnimationMs + UI_TIMING.crunchSettleMs);
+      clearCrunchMeterOverride();
       showTurnIndicator();
       break;
     }
