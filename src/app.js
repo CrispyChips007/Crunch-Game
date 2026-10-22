@@ -31,6 +31,7 @@ let crunchMeterOverride = null;
 let pendingCrunchStreak = null;
 let pendingCrunchMessage = "";
 let crunchMarkSlam = false;
+let crunchBusy = false;
 const crunchHandoffDelay = (showResetMessage) => UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs + UI_TIMING.crunchSettleMs + (showResetMessage ? UI_TIMING.crunchResetMessageMs : 0);
 
 function rankFor(completed) { return RANKS.find(([threshold]) => completed >= threshold)[1]; }
@@ -44,8 +45,8 @@ function crunchMark(slam) {
 function render() {
   const isComputerMatch = state.mode === "computer";
   const humanScore = isComputerMatch ? state.players[0].score : state.totalScore;
-  $("#score-label").textContent = isComputerMatch ? "Target" : "Total score";
-  $("#score-value").textContent = (isComputerMatch ? state.config.winningTarget : humanScore).toLocaleString();
+  $("#score-label").textContent = "Target";
+  $("#score-value").textContent = state.config.winningTarget.toLocaleString();
   const activeCrunchStreak = crunchMeterOverride ?? (isComputerMatch ? (state.players[state.activePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0));
   $("#crunch-count").innerHTML = Array.from({ length: activeCrunchStreak }, (_, index) => crunchMark(crunchMarkSlam && index === activeCrunchStreak - 1)).join("");
   $(".crunch-meter").setAttribute("aria-label", `${activeCrunchStreak} consecutive ${activeCrunchStreak === 1 ? "Crunch" : "Crunches"}`);
@@ -53,7 +54,7 @@ function render() {
   $("#turn-count").textContent = isComputerMatch ? state.round : state.turnCount;
   document.querySelectorAll("[data-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === (state.mode || "practice"));
-    button.disabled = computerBusy;
+    button.disabled = computerBusy || crunchBusy;
   });
   $("#players").hidden = false;
   if (isComputerMatch) {
@@ -69,7 +70,7 @@ function render() {
   $("#selection-score").textContent = selectedScore ? `${selectedScore.toLocaleString()} from selected dice` : "No dice selected";
   $("#message").textContent = state.message;
   const scoring = new Set(scoringOptions(state.dice).flatMap((option) => option.indices));
-  const canSelectDice = state.status === "playing" && !state.awaitingNextTurn && (!isComputerMatch || state.activePlayer === 0) && !computerBusy;
+  const canSelectDice = state.status === "playing" && !state.awaitingNextTurn && (!isComputerMatch || state.activePlayer === 0) && !computerBusy && !crunchBusy;
   const diceOwner = isComputerMatch && state.dice.length
     ? (state.awaitingNextTurn ? (state.activePlayer === 0 ? 1 : 0) : state.activePlayer)
     : 0;
@@ -86,9 +87,9 @@ function render() {
   $(".controls").classList.toggle("choice-ready", bankable);
   const waitingToStart = isComputerMatch && !state.openingRevealed;
   const humanTurn = !isComputerMatch || state.activePlayer === 0 || waitingToStart;
-  $("#bank").disabled = !bankable || !humanTurn || computerBusy;
+  $("#bank").disabled = !bankable || !humanTurn || computerBusy || crunchBusy;
   $("#bank").title = actionable && !meetsOpeningRequirement ? `You need ${state.config.openingRequirement.toLocaleString()} points to open.` : "";
-  $("#roll").disabled = !humanTurn || computerBusy || Boolean(state.dice.length && !actionable && !state.awaitingNextTurn);
+  $("#roll").disabled = !humanTurn || computerBusy || crunchBusy || Boolean(state.dice.length && !actionable && !state.awaitingNextTurn);
   $("#roll").textContent = waitingToStart ? "Start game" : (state.awaitingNextTurn ? "Roll dice" : (state.dice.length ? "Roll again" : "Roll dice"));
   if (state.status === "playing" && hasGameProgress(state)) saveGame(state);
   else if (state.status === "playing") clearGame();
@@ -171,6 +172,7 @@ function hideCrunchResetMessage() {
 }
 
 function prepareCrunchMeter(previousStreak, nextStreak, message = "") {
+  crunchBusy = true;
   crunchMeterOverride = previousStreak;
   pendingCrunchStreak = nextStreak;
   pendingCrunchMessage = message;
@@ -178,6 +180,7 @@ function prepareCrunchMeter(previousStreak, nextStreak, message = "") {
 }
 
 function clearCrunchMeterOverride() {
+  crunchBusy = false;
   crunchMeterOverride = null;
   pendingCrunchStreak = null;
   pendingCrunchMessage = "";
@@ -245,7 +248,7 @@ function doBank() {
     if (state.status === "finished") renderMatchResult();
     else {
       $("#win-title").textContent = "You crunched it!";
-      $("#win-copy").textContent = `${state.totalScore.toLocaleString()} points in ${state.turnCount} turns. Rank: ${rankFor(stats.completed)}.`;
+      $("#win-copy").innerHTML = `<div class="practice-summary"><span>${state.totalScore.toLocaleString()} points in ${state.turnCount} turns.</span><strong>Rank: ${rankFor(stats.completed)}</strong></div>`;
     }
     $("#win").showModal();
   } else saveStats(stats);
