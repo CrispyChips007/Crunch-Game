@@ -138,12 +138,16 @@ async function showOpeningRollSequence() {
   render();
   for (const [index, [humanRoll, computerRoll]] of state.openingRolls.entries()) {
     const result = humanRoll === computerRoll ? "Tie — roll again" : (state.startingPlayer === 0 ? "You start" : "Crunchy starts");
-    indicator.innerHTML = `<div class="opening-roll-stage"><span>You${miniDie(humanRoll)}<b class="sr-only">rolled ${humanRoll}</b></span><strong class="opening-roll-result">${result}</strong><span>Crunchy${miniDie(computerRoll)}<b class="sr-only">rolled ${computerRoll}</b></span></div>`;
+    indicator.innerHTML = `<div class="opening-roll-stage"><span>You${miniDie(humanRoll)}<b class="sr-only">rolled ${humanRoll}</b></span><strong class="opening-roll-result"></strong><span>Crunchy${miniDie(computerRoll)}<b class="sr-only">rolled ${computerRoll}</b></span></div>`;
     indicator.setAttribute("aria-hidden", "false");
     indicator.classList.remove("active");
     void indicator.offsetWidth;
     indicator.classList.add("active");
-    await pause(UI_TIMING.openingRollRevealMs);
+    await pause(UI_TIMING.openingResultDelayMs);
+    const resultElement = indicator.querySelector(".opening-roll-result");
+    resultElement.textContent = result;
+    resultElement.classList.add("show");
+    await pause(UI_TIMING.openingRollRevealMs - UI_TIMING.openingResultDelayMs);
     if (index < state.openingRolls.length - 1) await pause(400);
   }
   indicator.classList.remove("active");

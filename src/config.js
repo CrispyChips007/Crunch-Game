@@ -19,6 +19,7 @@ export const UI_TIMING = Object.freeze({
   crunchAnimationMs: 900,
   turnIndicatorMs: 1150,
   openingRollRevealMs: 2600,
+  openingResultDelayMs: 1100,
   computerTurnStartMs: 1100,
   computerRollPauseMs: 1050,
   computerSelectionPauseMs: 1000,
