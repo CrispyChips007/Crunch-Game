@@ -120,14 +120,26 @@ function playCrunchEffect() {
   }
   const card = $(".game-card");
   const effect = $("#crunch-effect");
+  const effectText = effect.querySelector("strong");
+  const targetMark = $("#crunch-count .crunch-mark:last-child");
   card.classList.remove("is-crunching");
   effect.classList.remove("active");
+  effect.classList.remove("to-meter");
+  if (targetMark) {
+    const sourceRect = effectText.getBoundingClientRect();
+    const targetRect = targetMark.getBoundingClientRect();
+    effect.style.setProperty("--crunch-target-x", `${targetRect.left + targetRect.width / 2 - (sourceRect.left + sourceRect.width / 2)}px`);
+    effect.style.setProperty("--crunch-target-y", `${targetRect.top + targetRect.height / 2 - (sourceRect.top + sourceRect.height / 2)}px`);
+    effect.style.setProperty("--crunch-target-scale", Math.max(.08, targetRect.height / sourceRect.width));
+    effect.classList.add("to-meter");
+  }
   void effect.offsetWidth;
   card.classList.add("is-crunching");
   effect.classList.add("active");
   effect.addEventListener("animationend", () => {
     card.classList.remove("is-crunching");
     effect.classList.remove("active");
+    effect.classList.remove("to-meter");
   }, { once: true });
 }
 

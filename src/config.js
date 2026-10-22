@@ -17,7 +17,7 @@ export const AD_CONFIG = Object.freeze({
 export const UI_TIMING = Object.freeze({
   crunchRevealMs: 1300,
   crunchAnimationMs: 900,
-  crunchSettleMs: 550,
+  crunchSettleMs: 1100,
   turnIndicatorMs: 1150,
   openingRollRevealMs: 2600,
   openingResultDelayMs: 1100,
