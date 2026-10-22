@@ -141,7 +141,7 @@ async function showOpeningRollSequence() {
     void indicator.offsetWidth;
     indicator.classList.add("active");
     await pause(UI_TIMING.openingRollRevealMs);
-    if (index < state.openingRolls.length - 1) await pause(250);
+    if (index < state.openingRolls.length - 1) await pause(400);
   }
   indicator.classList.remove("active");
   indicator.setAttribute("aria-hidden", "true");
