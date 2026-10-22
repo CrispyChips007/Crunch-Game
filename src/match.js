@@ -10,15 +10,15 @@ export function rollForStarter(dieRoller = secureDie) {
 
 export function createComputerMatch(config = GAME_CONFIG, dieRoller = secureDie) {
   const openingRoll = rollForStarter(dieRoller);
-  const starterName = openingRoll.startingPlayer === 0 ? "You start." : "Crunchy starts.";
   return {
     ...createGame(config), mode: "computer", round: 1, activePlayer: openingRoll.startingPlayer,
     startingPlayer: openingRoll.startingPlayer, openingRolls: openingRoll.rolls,
+    openingRevealed: false,
     players: [
       { id: "human", name: "You", score: 0, opened: false, turns: 0, crunchStreak: 0 },
       { id: "computer", name: "Crunchy", score: 0, opened: false, turns: 0, crunchStreak: 0 },
     ],
-    message: `Opening high roll: ${starterName}`,
+    message: "Press Start game to roll for first turn.",
   };
 }
 

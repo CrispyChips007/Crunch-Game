@@ -11,7 +11,8 @@ test("opening high roll chooses the starter and rerolls ties", () => {
   assert.equal(result.startingPlayer,1);
   const state=createComputerMatch(undefined,roller([2,6]));
   assert.equal(state.activePlayer,1);
-  assert.match(state.message,/Crunchy starts/);
+  assert.equal(state.openingRevealed,false);
+  assert.match(state.message,/Start game/);
 });
 test("round numbering follows the opening-roll winner", () => {
   let state=createComputerMatch(undefined,roller([1,6]));

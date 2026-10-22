@@ -9,6 +9,7 @@ import { scoringOptions } from "./scoring.js";
 const $ = (selector) => document.querySelector(selector);
 document.documentElement.style.setProperty("--crunch-animation-ms", `${UI_TIMING.crunchAnimationMs}ms`);
 document.documentElement.style.setProperty("--turn-indicator-ms", `${UI_TIMING.turnIndicatorMs}ms`);
+document.documentElement.style.setProperty("--opening-roll-ms", `${UI_TIMING.openingRollRevealMs}ms`);
 function hasGameProgress(game) {
   if (!game) return false;
   if (game.openingRolls?.length) return true;
@@ -19,6 +20,9 @@ function hasGameProgress(game) {
 const savedGame = loadGame();
 let state = hasGameProgress(savedGame) ? savedGame : createComputerMatch();
 state.config = GAME_CONFIG;
+if (state.mode === "computer" && state.openingRevealed === undefined) {
+  state.openingRevealed = Boolean(state.players?.some((player) => player.turns) || state.dice?.length);
+}
 let stats = loadStats();
 let prefs = loadPrefs();
 let bestRun = loadBestRun();
@@ -35,25 +39,18 @@ function render() {
   $("#score-label").textContent = isComputerMatch ? "Target" : "Total score";
   $("#score-value").textContent = (isComputerMatch ? state.config.winningTarget : humanScore).toLocaleString();
   const activeCrunchStreak = isComputerMatch ? (state.players[state.activePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0);
-  $("#crunch-count").innerHTML = [0, 1, 2].map((index) => `<i class="crunch-mark${index < activeCrunchStreak ? " active" : ""}"><b>CR</b>UNCH</i>`).join("");
+  $("#crunch-count").innerHTML = Array.from({ length: activeCrunchStreak }, () => `<i class="crunch-mark"><b>CR</b>UNCH</i>`).join("");
   $(".crunch-meter").setAttribute("aria-label", `${activeCrunchStreak} consecutive ${activeCrunchStreak === 1 ? "Crunch" : "Crunches"}`);
   $("#turn-label").textContent = isComputerMatch ? "Round" : "Turn";
   $("#turn-count").textContent = isComputerMatch ? state.round : state.turnCount;
   document.querySelectorAll("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === (state.mode || "practice")));
   $("#players").hidden = false;
   if (isComputerMatch) {
-    $("#players").innerHTML = state.players.map((player, index) => `<div class="player-chip${index === state.activePlayer ? " active" : ""}"><span>${player.name}</span><strong>${player.score.toLocaleString()}</strong><small>${player.opened ? "Bank any score" : "Needs 1,000"}</small></div>`).join("");
+    $("#players").innerHTML = state.players.map((player, index) => `<div class="player-chip${state.openingRevealed && index === state.activePlayer ? " active" : ""}"><span>${player.name}</span><strong>${player.score.toLocaleString()}</strong><small>${player.opened ? "Bank any score" : "Needs 1,000"}</small></div>`).join("");
   } else {
     const completedTurns = state.scoreHistory?.length ?? 0;
     const ghostScore = bestRun ? (bestRun.scores[completedTurns - 1] ?? (completedTurns >= bestRun.turns ? bestRun.finalScore : 0)) : null;
     $("#players").innerHTML = `<div class="player-chip active"><span>You</span><strong>${humanScore.toLocaleString()}</strong><small>Current run</small></div><div class="player-chip ghost"><span>Best Run</span><strong>${ghostScore === null ? "—" : ghostScore.toLocaleString()}</strong><small>${bestRun ? `${bestRun.turns} turns to beat` : "Complete a game to set"}</small></div>`;
-  }
-  const showOpeningRoll = isComputerMatch && !state.players.some((player) => player.turns) && !state.dice.length && state.openingRolls?.length;
-  $("#opening-roll").hidden = !showOpeningRoll;
-  if (showOpeningRoll) {
-    const [humanRoll, computerRoll] = state.openingRolls.at(-1);
-    const ties = state.openingRolls.length - 1;
-    $("#opening-roll").innerHTML = `<span>You${miniDie(humanRoll)}<b class="sr-only">rolled ${humanRoll}</b></span><strong>${state.startingPlayer === 0 ? "You start" : "Crunchy starts"}${ties ? `<br>${ties} tie${ties === 1 ? "" : "s"} rerolled` : ""}</strong><span>Crunchy${miniDie(computerRoll)}<b class="sr-only">rolled ${computerRoll}</b></span>`;
   }
   const result = selectionResult(state);
   const selectedScore = result.valid ? result.score : 0;
@@ -76,16 +73,21 @@ function render() {
   const meetsOpeningRequirement = activeOpened || prospectiveBank >= state.config.openingRequirement;
   const bankable = actionable && meetsOpeningRequirement;
   $(".controls").classList.toggle("choice-ready", bankable);
-  const humanTurn = !isComputerMatch || state.activePlayer === 0;
+  const waitingToStart = isComputerMatch && !state.openingRevealed;
+  const humanTurn = !isComputerMatch || state.activePlayer === 0 || waitingToStart;
   $("#bank").disabled = !bankable || !humanTurn || computerBusy;
   $("#bank").title = actionable && !meetsOpeningRequirement ? `You need ${state.config.openingRequirement.toLocaleString()} points to open.` : "";
   $("#roll").disabled = !humanTurn || computerBusy || Boolean(state.dice.length && !actionable && !state.awaitingNextTurn);
-  $("#roll").textContent = state.awaitingNextTurn ? "Roll dice" : (state.dice.length ? "Roll again" : (state.turnCount === 1 && state.totalScore === 0 ? "Start game" : "Roll dice"));
+  $("#roll").textContent = waitingToStart ? "Start game" : (state.awaitingNextTurn ? "Roll dice" : (state.dice.length ? "Roll again" : "Roll dice"));
   if (state.status === "playing" && hasGameProgress(state)) saveGame(state);
   else if (state.status === "playing") clearGame();
 }
 
 function doRoll() {
+  if (state.mode === "computer" && !state.openingRevealed) {
+    showOpeningRollSequence();
+    return;
+  }
   const beforePlayer = state.activePlayer;
   state = state.mode === "computer" ? matchRoll(state) : roll(state);
   const crunched = state.lastEvent === "crunch" || state.lastEvent === "triple-crunch";
@@ -126,6 +128,29 @@ function showTurnIndicator() {
   indicator.addEventListener("animationend", () => indicator.classList.remove("active"), { once: true });
 }
 
+async function showOpeningRollSequence() {
+  if (computerBusy || state.mode !== "computer" || state.openingRevealed || !state.openingRolls?.length) return;
+  const indicator = $("#opening-indicator");
+  computerBusy = true;
+  render();
+  for (const [index, [humanRoll, computerRoll]] of state.openingRolls.entries()) {
+    const result = humanRoll === computerRoll ? "Tie — roll again" : (state.startingPlayer === 0 ? "You start" : "Crunchy starts");
+    indicator.innerHTML = `<div class="opening-roll-stage"><span>You${miniDie(humanRoll)}<b class="sr-only">rolled ${humanRoll}</b></span><strong class="opening-roll-result">${result}</strong><span>Crunchy${miniDie(computerRoll)}<b class="sr-only">rolled ${computerRoll}</b></span></div>`;
+    indicator.setAttribute("aria-hidden", "false");
+    indicator.classList.remove("active");
+    void indicator.offsetWidth;
+    indicator.classList.add("active");
+    await pause(UI_TIMING.openingRollRevealMs);
+    if (index < state.openingRolls.length - 1) await pause(250);
+  }
+  indicator.classList.remove("active");
+  indicator.setAttribute("aria-hidden", "true");
+  state = { ...state, openingRevealed: true, message: state.startingPlayer === 0 ? "Your turn." : "Crunchy's turn." };
+  computerBusy = false;
+  render();
+  if (state.activePlayer === 1) scheduleComputerTurn();
+}
+
 function doBank() {
   const previous = state;
   const beforePlayer = state.activePlayer;
@@ -160,7 +185,7 @@ function doBank() {
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 async function scheduleComputerTurn() {
   if (computerBusy || state.mode !== "computer" || state.activePlayer !== 1 || state.status !== "playing") return;
-  const openingDelay = !state.players.some((player) => player.turns) && !state.dice.length ? UI_TIMING.openingRollRevealMs : UI_TIMING.computerTurnStartMs;
+  const openingDelay = UI_TIMING.computerTurnStartMs;
   computerBusy = true; render(); await pause(openingDelay);
   while (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
     if (state.awaitingNextTurn || !state.dice.length) {
@@ -218,7 +243,7 @@ function renderMatchResult() {
 }
 
 function beginComputerTurnIfNeeded() {
-  if (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") scheduleComputerTurn();
+  if (state.mode === "computer" && state.openingRevealed && state.activePlayer === 1 && state.status === "playing") scheduleComputerTurn();
 }
 
 $("#dice").addEventListener("click", (event) => { const button = event.target.closest("[data-die]"); if (button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleSelection(state, Number(button.dataset.die)); render(); } });
@@ -247,7 +272,7 @@ addEventListener("resize", () => renderAds(AD_CONFIG));
 $("#scoring-help").checked = prefs.scoringHelp;
 render();
 if (!prefs.introSeen) { $("#intro").showModal(); prefs.introSeen = true; savePrefs(prefs); }
-if (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
+if (state.mode === "computer" && state.openingRevealed && state.activePlayer === 1 && state.status === "playing") {
   if (state.players.some((player) => player.turns) || state.dice.length) showTurnIndicator();
   scheduleComputerTurn();
 }
