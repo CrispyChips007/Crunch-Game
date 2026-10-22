@@ -43,7 +43,10 @@ function render() {
   $(".crunch-meter").setAttribute("aria-label", `${activeCrunchStreak} consecutive ${activeCrunchStreak === 1 ? "Crunch" : "Crunches"}`);
   $("#turn-label").textContent = isComputerMatch ? "Round" : "Turn";
   $("#turn-count").textContent = isComputerMatch ? state.round : state.turnCount;
-  document.querySelectorAll("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === (state.mode || "practice")));
+  document.querySelectorAll("[data-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.mode === (state.mode || "practice"));
+    button.disabled = computerBusy;
+  });
   $("#players").hidden = false;
   if (isComputerMatch) {
     $("#players").innerHTML = state.players.map((player, index) => `<div class="player-chip${state.openingRevealed && index === state.activePlayer ? " active" : ""}"><span>${player.name}</span><strong>${player.score.toLocaleString()}</strong><small>${player.opened ? "Bank any score" : "Needs 1,000"}</small></div>`).join("");
