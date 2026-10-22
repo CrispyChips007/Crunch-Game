@@ -36,8 +36,11 @@
       <div class="mode-switch" aria-label="Game mode"><button data-mode="computer" class="active">Vs Crunchy</button><button data-mode="practice">Practice</button></div>
       <div id="players" class="players" hidden></div>
       <div class="scoreboard">
-        <div><span>Total score</span><strong id="total-score">0</strong></div>
-        <div class="target"><span>Target</span><strong id="target-score">10,000</strong></div>
+        <div><span id="score-label">Target</span><strong id="score-value">10,000</strong></div>
+        <div class="crunch-meter" aria-label="No consecutive Crunches">
+          <span class="sr-only">Consecutive Crunches</span>
+          <div id="crunch-count" class="crunch-count" aria-hidden="true"></div>
+        </div>
         <div><span id="turn-label">Turn</span><strong id="turn-count">1</strong></div>
       </div>
       <div class="turn-panel">
@@ -79,6 +82,7 @@
     <ul class="rule-notes">
       <li>To add points to your total for the first time, you must earn and Bank at least <b>1,000 points in one turn</b>. After that, you may Bank any amount.</li>
       <li>A roll with no scoring dice is a <b>Crunch</b>. You lose every unbanked point from that turn.</li>
+      <li>After you have opened, <b>three consecutive Crunches</b> reset your total score to zero. Banking any score clears the count, and you stay Open after a reset.</li>
       <li>If all five dice score, you may roll again with all five dice.</li>
     </ul>
     <label class="toggle"><input id="scoring-help" type="checkbox"> Show subtle scoring hints</label>

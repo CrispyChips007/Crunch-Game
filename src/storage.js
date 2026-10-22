@@ -1,4 +1,4 @@
-const GAME_KEY = "crunch.game.v1";
+const GAME_KEY = "crunch.game.v2";
 const STATS_KEY = "crunch.stats.v1";
 const PREFS_KEY = "crunch.prefs.v1";
 

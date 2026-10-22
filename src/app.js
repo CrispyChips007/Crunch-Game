@@ -18,10 +18,6 @@ function hasGameProgress(game) {
 const savedGame = loadGame();
 let state = hasGameProgress(savedGame) ? savedGame : createComputerMatch();
 state.config = GAME_CONFIG;
-// Repair games saved before the ended-turn flag was introduced.
-if (state.message?.startsWith("Crunch!")) {
-  state = { ...state, dice: state.dice?.length ? state.dice : (state.lastRoll || []), selected: [], awaitingNextTurn: true };
-}
 let stats = loadStats();
 let prefs = loadPrefs();
 let computerBusy = false;
@@ -34,8 +30,11 @@ function miniDie(face) { return `<i class="mini-die face-${face}" aria-hidden="t
 function render() {
   const isComputerMatch = state.mode === "computer";
   const humanScore = isComputerMatch ? state.players[0].score : state.totalScore;
-  $("#total-score").textContent = humanScore.toLocaleString();
-  $("#target-score").textContent = state.config.winningTarget.toLocaleString();
+  $("#score-label").textContent = isComputerMatch ? "Target" : "Total score";
+  $("#score-value").textContent = (isComputerMatch ? state.config.winningTarget : humanScore).toLocaleString();
+  const activeCrunchStreak = isComputerMatch ? (state.players[state.activePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0);
+  $("#crunch-count").innerHTML = [0, 1, 2].map((index) => `<i class="crunch-mark${index < activeCrunchStreak ? " active" : ""}"><b>CR</b>UNCH</i>`).join("");
+  $(".crunch-meter").setAttribute("aria-label", `${activeCrunchStreak} consecutive ${activeCrunchStreak === 1 ? "Crunch" : "Crunches"}`);
   $("#turn-label").textContent = isComputerMatch ? "Round" : "Turn";
   $("#turn-count").textContent = isComputerMatch ? state.round : state.turnCount;
   document.querySelectorAll("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === (state.mode || "practice")));
@@ -48,6 +47,11 @@ function render() {
   $("#message").textContent = state.message;
   const scoring = new Set(scoringOptions(state.dice).flatMap((option) => option.indices));
   const canSelectDice = state.status === "playing" && !state.awaitingNextTurn && (!isComputerMatch || state.activePlayer === 0) && !computerBusy;
+  const diceOwner = isComputerMatch && state.dice.length
+    ? (state.awaitingNextTurn ? (state.activePlayer === 0 ? 1 : 0) : state.activePlayer)
+    : 0;
+  $("#dice").classList.toggle("crunchy-dice", diceOwner === 1);
+  $("#dice").setAttribute("aria-label", diceOwner === 1 ? "Crunchy's dice" : "Dice");
   $("#dice").innerHTML = state.dice.map((face, index) => `<button class="die face-${face}${state.selected.includes(index) ? " selected" : ""}${prefs.scoringHelp && scoring.has(index) ? " hint" : ""}" data-die="${index}" aria-label="Die ${index + 1}: ${face}${state.selected.includes(index) ? ", selected" : ""}"${canSelectDice ? "" : " disabled"}>${dots(face)}</button>`).join("");
   const triples = canSelectDice ? [1, 5].filter((face) => state.dice.filter((d) => d === face).length >= 3) : [];
   $("#combo-actions").innerHTML = triples.map((face) => `<button data-triple="${face}">Select three ${face}s · ${face === 1 ? "1,000" : "500"}</button>`).join("");
@@ -67,10 +71,9 @@ function render() {
 }
 
 function doRoll() {
-  const beforeTurn = state.turnCount;
   const beforePlayer = state.activePlayer;
   state = state.mode === "computer" ? matchRoll(state) : roll(state);
-  const crunched = state.message.startsWith("Crunch") || (state.mode === "computer" && state.activePlayer !== beforePlayer && state.dice.length > 0);
+  const crunched = state.lastEvent === "crunch" || state.lastEvent === "triple-crunch";
   if (crunched) { stats = recordCrunch(stats); saveStats(stats); }
   render();
   if (crunched) setTimeout(playCrunchEffect, UI_TIMING.crunchRevealMs);
@@ -155,7 +158,7 @@ async function scheduleComputerTurn() {
     state = { ...state, selected: choice.indices, message: `Crunchy selects ${choice.score.toLocaleString()} points.` };
     render(); await pause(UI_TIMING.computerSelectionPauseMs);
     const player = state.players[1];
-    const action = chooseComputerAction({ opened: player.opened, unbankedPoints: state.turnScore + choice.score, diceRemaining: state.config.diceCount - state.retainedCount - choice.indices.length || state.config.diceCount, totalScore: player.score, opponentScore: state.players[0].score }, state.config);
+    const action = chooseComputerAction({ opened: player.opened, unbankedPoints: state.turnScore + choice.score, diceRemaining: state.config.diceCount - state.retainedCount - choice.indices.length || state.config.diceCount, totalScore: player.score, opponentScore: state.players[0].score, crunchStreak: player.crunchStreak ?? 0 }, state.config);
     if (action === "bank") {
       const bankSelection = maximumComputerSelection(state.dice);
       if (bankSelection && bankSelection.indices.join(",") !== state.selected.join(",")) {

@@ -4,8 +4,8 @@ import { rollDice } from "./random.js";
 
 export function createGame(config = GAME_CONFIG) {
   return {
-    version: 1, totalScore: 0, turnScore: 0, retainedCount: 0,
-    dice: [], selected: [], turnCount: 1, opened: false,
+    version: 2, totalScore: 0, turnScore: 0, retainedCount: 0,
+    dice: [], selected: [], turnCount: 1, opened: false, crunchStreak: 0,
     status: "playing", message: "Roll the dice to begin.", config,
   };
 }
@@ -29,14 +29,23 @@ export function roll(state, dieRoller) {
   const count = hotDice ? state.config.diceCount : state.config.diceCount - retainedCount;
   const dice = rollDice(count, dieRoller);
   if (isCrunch(dice)) {
+    const crunchStreak = state.opened ? (state.crunchStreak ?? 0) + 1 : 0;
+    const crunchedBackToZero = crunchStreak >= 3;
     return {
       ...state, dice, selected: [], turnScore: 0, retainedCount: 0, awaitingNextTurn: true,
-      turnCount: state.turnCount + 1, message: "Crunch! Turn points lost. Roll to start the next turn.",
+      totalScore: crunchedBackToZero ? 0 : state.totalScore,
+      crunchStreak: crunchedBackToZero ? 0 : crunchStreak,
+      lastEvent: crunchedBackToZero ? "triple-crunch" : "crunch",
+      turnCount: state.turnCount + 1,
+      message: crunchedBackToZero
+        ? "Oh no! You crunched back to zero. Roll to start the next turn."
+        : "Crunch! Turn points lost. Roll to start the next turn.",
     };
   }
   return {
     ...state, dice, selected: [], turnScore, awaitingNextTurn: false,
     retainedCount: hotDice ? 0 : retainedCount,
+    lastEvent: null,
     message: hotDice ? "Hot dice! All five dice are back." : "Choose scoring dice.",
   };
 }
@@ -53,6 +62,7 @@ export function bank(state) {
   const won = totalScore >= state.config.winningTarget;
   return {
     ...state, totalScore, turnScore: 0, retainedCount: 0, dice: [], selected: [], opened: true,
+    crunchStreak: 0, lastEvent: "bank",
     status: won ? "won" : "playing", turnCount: won ? state.turnCount : state.turnCount + 1,
     message: won ? `You reached ${totalScore.toLocaleString()}!` : `Banked ${banked.toLocaleString()}. Roll for the next turn.`,
     lastBanked: banked,

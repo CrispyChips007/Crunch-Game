@@ -22,10 +22,11 @@ Node.js 20 or later is recommended. The game itself needs only a modern browser.
 
 Roll five dice and select at least one scoring die or triple. Single 1s score 100 and single 5s score 50. Three 1s score 1,000; triples of 2–6 score face value × 100. A scoring triple uses exactly three dice: fourth and fifth 2s, 3s, 4s, or 6s cannot be retained, while extra 1s and 5s score as singles.
 
-Bank to add the turn score to your total, or roll the remaining dice. When all five dice have legitimately scored, all five return (“hot dice”). A roll with no score is a Crunch and loses the unbanked turn score. The first bank must reach 1,000. Reach 10,000 to win.
+Bank to add the turn score to your total, or roll the remaining dice. When all five dice have legitimately scored, all five return (“hot dice”). A roll with no score is a Crunch and loses the unbanked turn score. After opening, three consecutive Crunches reset that player's total to zero; banking clears the streak, and an opened player remains open after the reset. The first bank must reach 1,000. Reach 10,000 to win.
 
 Assumptions made for ambiguous details:
 
+- The consecutive-Crunch rules update starts a fresh in-progress game; existing statistics and preferences are preserved.
 - A Crunch completes the current turn and the next roll begins the next turn.
 - Turn count starts at one and counts the winning turn.
 - Games abandoned through Restart are tracked; closing a tab is not considered an abandonment.

@@ -31,11 +31,13 @@ export function chooseComputerSelection(dice, { opened, turnScore, openingRequir
 }
 
 export function chooseComputerAction(publicState, config = GAME_CONFIG) {
-  const { opened, unbankedPoints, diceRemaining, totalScore, opponentScore } = publicState;
+  const { opened, unbankedPoints, diceRemaining, totalScore, opponentScore, crunchStreak = 0 } = publicState;
   if (!opened) return unbankedPoints >= config.openingRequirement ? "bank" : "roll";
   if (totalScore + unbankedPoints >= config.winningTarget) return "bank";
   const thresholds = { 1: 150, 2: 250, 3: 400, 4: 600, 5: 750 };
   let threshold = thresholds[diceRemaining] ?? 400;
+  if (crunchStreak === 1) threshold = Math.max(100, threshold - (diceRemaining <= 2 ? 100 : 50));
+  if (crunchStreak >= 2) threshold = 50;
   if (totalScore < opponentScore) threshold += Math.min(250, Math.floor((opponentScore - totalScore) / 10));
   if (totalScore >= config.winningTarget - 1500) threshold = Math.max(100, threshold - 150);
   return unbankedPoints >= threshold ? "bank" : "roll";

@@ -8,10 +8,20 @@ test("computer cannot bank below its opening threshold", () => {
   assert.equal(chooseComputerAction({opened:false,unbankedPoints:950,diceRemaining:1,totalScore:0,opponentScore:0}),"roll");
   assert.equal(chooseComputerAction({opened:false,unbankedPoints:1000,diceRemaining:1,totalScore:0,opponentScore:0}),"bank");
 });
+test("computer stays open after falling below 1,000 and does not chase a new opening score", () => {
+  assert.equal(chooseComputerAction({opened:true,unbankedPoints:400,diceRemaining:1,totalScore:0,opponentScore:2000,crunchStreak:0}),"bank");
+});
 test("computer banking is primarily biased by dice remaining", () => {
   const common={opened:true,unbankedPoints:300,totalScore:2000,opponentScore:2000};
   assert.equal(chooseComputerAction({...common,diceRemaining:1}),"bank");
   assert.equal(chooseComputerAction({...common,diceRemaining:5}),"roll");
+});
+test("computer becomes cautious as consecutive Crunches increase", () => {
+  const common={opened:true,unbankedPoints:50,diceRemaining:5,totalScore:2000,opponentScore:2000};
+  assert.equal(chooseComputerAction({...common,crunchStreak:0}),"roll");
+  assert.equal(chooseComputerAction({...common,crunchStreak:1}),"roll");
+  assert.equal(chooseComputerAction({...common,crunchStreak:2}),"bank");
+  assert.equal(chooseComputerAction({...common,unbankedPoints:150,diceRemaining:2,crunchStreak:1}),"bank");
 });
 test("computer selection favors points per retained die", () => {
   assert.deepEqual(bestComputerSelection([2,2,2,1,4]),{indices:[3],score:100});
@@ -34,6 +44,16 @@ test("match alternates after a Crunch and preserves the roll", () => {
   assert.equal(state.activePlayer,1);
   assert.equal(state.players[0].turns,1);
   assert.deepEqual(state.dice,[2,3,4,6,2]);
+});
+test("match tracks each player's Crunch streak and resets only that player's score", () => {
+  let state={...createComputerMatch(),players:[{id:'human',name:'You',score:2400,opened:true,turns:2,crunchStreak:2},{id:'computer',name:'Crunchy',score:1800,opened:true,turns:2,crunchStreak:1}],totalScore:2400,opened:true,crunchStreak:2};
+  state=matchRoll(state,roller([2,3,4,6,2]));
+  assert.equal(state.players[0].score,0);
+  assert.equal(state.players[0].crunchStreak,0);
+  assert.equal(state.players[0].opened,true);
+  assert.equal(state.players[1].score,1800);
+  assert.equal(state.players[1].crunchStreak,1);
+  assert.match(state.message,/You crunched back to zero/i);
 });
 test("match bank updates player and passes the turn", () => {
   let state={...createComputerMatch(),turnScore:900,dice:[1],selected:[0]};
