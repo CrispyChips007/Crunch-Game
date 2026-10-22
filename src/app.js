@@ -36,6 +36,10 @@ const crunchHandoffDelay = (showResetMessage) => UI_TIMING.crunchRevealMs + UI_T
 function rankFor(completed) { return RANKS.find(([threshold]) => completed >= threshold)[1]; }
 function dots(face) { return Array.from({ length: face }, () => "<i></i>").join(""); }
 function miniDie(face) { return `<i class="mini-die face-${face}" aria-hidden="true">${dots(face)}</i>`; }
+function crunchMark(slam) {
+  const letters = [..."CRUNCH"].map((letter, index) => `<span class="${index < 2 ? "accent" : ""}">${letter}</span>`).join("");
+  return `<i class="crunch-mark${slam ? " slam-in" : ""}">${letters}</i>`;
+}
 
 function render() {
   const isComputerMatch = state.mode === "computer";
@@ -43,7 +47,7 @@ function render() {
   $("#score-label").textContent = isComputerMatch ? "Target" : "Total score";
   $("#score-value").textContent = (isComputerMatch ? state.config.winningTarget : humanScore).toLocaleString();
   const activeCrunchStreak = crunchMeterOverride ?? (isComputerMatch ? (state.players[state.activePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0));
-  $("#crunch-count").innerHTML = Array.from({ length: activeCrunchStreak }, (_, index) => `<i class="crunch-mark${crunchMarkSlam && index === activeCrunchStreak - 1 ? " slam-in" : ""}"><b>CR</b>UNCH</i>`).join("");
+  $("#crunch-count").innerHTML = Array.from({ length: activeCrunchStreak }, (_, index) => crunchMark(crunchMarkSlam && index === activeCrunchStreak - 1)).join("");
   $(".crunch-meter").setAttribute("aria-label", `${activeCrunchStreak} consecutive ${activeCrunchStreak === 1 ? "Crunch" : "Crunches"}`);
   $("#turn-label").textContent = isComputerMatch ? "Round" : "Turn";
   $("#turn-count").textContent = isComputerMatch ? state.round : state.turnCount;
