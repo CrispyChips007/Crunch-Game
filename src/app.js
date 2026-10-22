@@ -32,6 +32,7 @@ let pendingCrunchStreak = null;
 let pendingCrunchMessage = "";
 let crunchMarkSlam = false;
 let crunchBusy = false;
+let muteCrunchyDice = state.mode === "computer" && state.activePlayer === 0 && state.awaitingNextTurn && state.dice?.length > 0;
 const crunchHandoffDelay = (showResetMessage) => UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs + UI_TIMING.crunchSettleMs + (showResetMessage ? UI_TIMING.crunchResetMessageMs : 0);
 
 function rankFor(completed) { return RANKS.find(([threshold]) => completed >= threshold)[1]; }
@@ -74,7 +75,7 @@ function render() {
   const diceOwner = isComputerMatch && state.dice.length
     ? (state.awaitingNextTurn ? (state.activePlayer === 0 ? 1 : 0) : state.activePlayer)
     : 0;
-  const crunchyDiceEnded = diceOwner === 1 && state.awaitingNextTurn;
+  const crunchyDiceEnded = diceOwner === 1 && state.awaitingNextTurn && muteCrunchyDice;
   $("#dice").classList.toggle("crunchy-dice-ended", crunchyDiceEnded);
   $("#dice").setAttribute("aria-label", crunchyDiceEnded ? "Crunchy's previous dice" : (diceOwner === 1 ? "Crunchy's dice" : "Dice"));
   $("#dice").innerHTML = state.dice.map((face, index) => `<button class="die face-${face}${state.selected.includes(index) ? " selected" : ""}${prefs.scoringHelp && scoring.has(index) ? " hint" : ""}" data-die="${index}" aria-label="Die ${index + 1}: ${face}${state.selected.includes(index) ? ", selected" : ""}"${canSelectDice ? "" : " disabled"}>${dots(face)}</button>`).join("");
@@ -102,6 +103,7 @@ function doRoll() {
     showOpeningRollSequence();
     return;
   }
+  muteCrunchyDice = false;
   const beforePlayer = state.activePlayer;
   const previousCrunchStreak = state.mode === "computer" ? (state.players[beforePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0);
   state = state.mode === "computer" ? matchRoll(state) : roll(state);
@@ -194,6 +196,8 @@ function showTurnIndicator() {
   const indicator = $("#turn-indicator");
   const player = state.players?.[state.activePlayer];
   if (!player) return;
+  muteCrunchyDice = player.id === "human" && state.awaitingNextTurn && state.dice.length > 0;
+  render();
   indicator.querySelector("strong").textContent = player.id === "human" ? "YOUR TURN" : `${player.name.toUpperCase()}'S\nTURN`;
   indicator.classList.remove("active");
   void indicator.offsetWidth;
@@ -267,6 +271,7 @@ async function scheduleComputerTurn() {
   computerBusy = true; render(); await pause(openingDelay);
   while (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
     if (state.awaitingNextTurn || !state.dice.length) {
+      muteCrunchyDice = false;
       const previousCrunchStreak = state.players[1].crunchStreak ?? 0;
       state = matchRoll(state); render();
       if (state.activePlayer !== 1) {
@@ -304,6 +309,7 @@ async function scheduleComputerTurn() {
       state = matchBank(state); render(); showTurnIndicator(); break;
     }
     const previousCrunchStreak = state.players[1].crunchStreak ?? 0;
+    muteCrunchyDice = false;
     state = matchRoll(state); render();
     if (state.activePlayer !== 1) {
       prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak, state.lastEvent === "triple-crunch" ? "CRUNCHY CRUNCHED BACK TO ZERO" : "");
