@@ -1,6 +1,6 @@
 # Crunch
 
-Crunch is a lightweight, mobile-first five-dice score challenge inspired by Farkle. **Vs Crunchy** is the default experience, while the solo score challenge remains available as **Practice mode**. It has no accounts, build step, external assets, or runtime dependencies and is ready for static hosting.
+Crunch is a lightweight, mobile-first five-dice score challenge inspired by Farkle. **Vs Crunchy** is the default experience, with a high roll deciding who starts each match. **Practice mode** races the player against the turn-by-turn pace of their best completed run. It has no accounts, build step, external assets, or runtime dependencies and is ready for static hosting.
 
 ## Play locally
 
@@ -22,7 +22,7 @@ Node.js 20 or later is recommended. The game itself needs only a modern browser.
 
 Roll five dice and select at least one scoring die or triple. Single 1s score 100 and single 5s score 50. Three 1s score 1,000; triples of 2–6 score face value × 100. A scoring triple uses exactly three dice: fourth and fifth 2s, 3s, 4s, or 6s cannot be retained, while extra 1s and 5s score as singles.
 
-Bank to add the turn score to your total, or roll the remaining dice. When all five dice have legitimately scored, all five return (“hot dice”). A roll with no score is a Crunch and loses the unbanked turn score. After opening, three consecutive Crunches reset that player's total to zero; banking clears the streak, and an opened player remains open after the reset. The first bank must reach 1,000. Reach 10,000 to win.
+Bank to add the turn score to your total, or roll the remaining dice. When all five dice have legitimately scored, all five return (“hot dice”). A roll with no score is a Crunch and loses the unbanked turn score. Once a player has banked points, three Crunches in a row wipe their total back to zero. Banking breaks the streak, and the 1,000-point minimum does not return after a reset. The first bank must reach 1,000. Reach 10,000 to win.
 
 Assumptions made for ambiguous details:
 

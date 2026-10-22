@@ -3,7 +3,7 @@ import { bank, canAct, createGame, roll, selectionResult, toggleSelection, toggl
 import { chooseComputerAction, chooseComputerSelection, maximumComputerSelection } from "./computer.js";
 import { createComputerMatch, matchBank, matchRoll } from "./match.js";
 import { renderAds } from "./ads.js";
-import { clearGame, loadGame, loadPrefs, loadStats, recordBank, recordCrunch, recordWin, saveGame, savePrefs, saveStats } from "./storage.js";
+import { betterBestRun, clearGame, loadBestRun, loadGame, loadPrefs, loadStats, recordBank, recordCrunch, recordWin, saveBestRun, saveGame, savePrefs, saveStats } from "./storage.js";
 import { scoringOptions } from "./scoring.js";
 
 const $ = (selector) => document.querySelector(selector);
@@ -11,6 +11,7 @@ document.documentElement.style.setProperty("--crunch-animation-ms", `${UI_TIMING
 document.documentElement.style.setProperty("--turn-indicator-ms", `${UI_TIMING.turnIndicatorMs}ms`);
 function hasGameProgress(game) {
   if (!game) return false;
+  if (game.openingRolls?.length) return true;
   if (game.dice?.length || game.totalScore || game.turnScore || game.retainedCount || game.turnCount > 1) return true;
   return Boolean(game.players?.some((player) => player.score || player.turns));
 }
@@ -20,6 +21,7 @@ let state = hasGameProgress(savedGame) ? savedGame : createComputerMatch();
 state.config = GAME_CONFIG;
 let stats = loadStats();
 let prefs = loadPrefs();
+let bestRun = loadBestRun();
 let computerBusy = false;
 const crunchHandoffDelay = UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs;
 
@@ -38,8 +40,21 @@ function render() {
   $("#turn-label").textContent = isComputerMatch ? "Round" : "Turn";
   $("#turn-count").textContent = isComputerMatch ? state.round : state.turnCount;
   document.querySelectorAll("[data-mode]").forEach((button) => button.classList.toggle("active", button.dataset.mode === (state.mode || "practice")));
-  $("#players").hidden = !isComputerMatch;
-  if (isComputerMatch) $("#players").innerHTML = state.players.map((player, index) => `<div class="player-chip${index === state.activePlayer ? " active" : ""}"><span>${player.name}</span><strong>${player.score.toLocaleString()}</strong><small>${player.opened ? "Open" : "Needs 1,000"}</small></div>`).join("");
+  $("#players").hidden = false;
+  if (isComputerMatch) {
+    $("#players").innerHTML = state.players.map((player, index) => `<div class="player-chip${index === state.activePlayer ? " active" : ""}"><span>${player.name}</span><strong>${player.score.toLocaleString()}</strong><small>${player.opened ? "Bank any score" : "Needs 1,000"}</small></div>`).join("");
+  } else {
+    const completedTurns = state.scoreHistory?.length ?? 0;
+    const ghostScore = bestRun ? (bestRun.scores[completedTurns - 1] ?? (completedTurns >= bestRun.turns ? bestRun.finalScore : 0)) : null;
+    $("#players").innerHTML = `<div class="player-chip active"><span>You</span><strong>${humanScore.toLocaleString()}</strong><small>Current run</small></div><div class="player-chip ghost"><span>Best Run</span><strong>${ghostScore === null ? "—" : ghostScore.toLocaleString()}</strong><small>${bestRun ? `${bestRun.turns} turns to beat` : "Complete a game to set"}</small></div>`;
+  }
+  const showOpeningRoll = isComputerMatch && !state.players.some((player) => player.turns) && !state.dice.length && state.openingRolls?.length;
+  $("#opening-roll").hidden = !showOpeningRoll;
+  if (showOpeningRoll) {
+    const [humanRoll, computerRoll] = state.openingRolls.at(-1);
+    const ties = state.openingRolls.length - 1;
+    $("#opening-roll").innerHTML = `<span>You${miniDie(humanRoll)}<b class="sr-only">rolled ${humanRoll}</b></span><strong>${state.startingPlayer === 0 ? "You start" : "Crunchy starts"}${ties ? `<br>${ties} tie${ties === 1 ? "" : "s"} rerolled` : ""}</strong><span>Crunchy${miniDie(computerRoll)}<b class="sr-only">rolled ${computerRoll}</b></span>`;
+  }
   const result = selectionResult(state);
   const selectedScore = result.valid ? result.score : 0;
   $("#turn-score").textContent = (state.turnScore + selectedScore).toLocaleString();
@@ -74,6 +89,7 @@ function doRoll() {
   const beforePlayer = state.activePlayer;
   state = state.mode === "computer" ? matchRoll(state) : roll(state);
   const crunched = state.lastEvent === "crunch" || state.lastEvent === "triple-crunch";
+  if (state.mode === "practice" && crunched) state = { ...state, scoreHistory: [...(state.scoreHistory ?? []), state.totalScore] };
   if (crunched) { stats = recordCrunch(stats); saveStats(stats); }
   render();
   if (crunched) setTimeout(playCrunchEffect, UI_TIMING.crunchRevealMs);
@@ -114,6 +130,7 @@ function doBank() {
   const previous = state;
   const beforePlayer = state.activePlayer;
   state = state.mode === "computer" ? matchBank(state) : bank(state);
+  if (state.mode === "practice" && state.lastEvent === "bank") state = { ...state, scoreHistory: [...(state.scoreHistory ?? []), state.totalScore] };
   if (state.lastBanked && state.lastBanked !== previous.lastBanked) stats = recordBank(stats, state.lastBanked);
   if (state.status === "won" || state.status === "finished") {
     if (state.status === "finished") {
@@ -122,7 +139,11 @@ function doBank() {
       if (state.draw) { /* draws count as completed only */ }
       else if (humanWon) stats.won += 1;
       else stats.lost += 1;
-    } else stats = recordWin(stats, state.turnCount);
+    } else {
+      stats = recordWin(stats, state.turnCount);
+      bestRun = betterBestRun(bestRun, state.scoreHistory);
+      saveBestRun(bestRun);
+    }
     saveStats(stats); clearGame();
     if (state.status === "finished") renderMatchResult();
     else {
@@ -139,7 +160,8 @@ function doBank() {
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 async function scheduleComputerTurn() {
   if (computerBusy || state.mode !== "computer" || state.activePlayer !== 1 || state.status !== "playing") return;
-  computerBusy = true; render(); await pause(UI_TIMING.computerTurnStartMs);
+  const openingDelay = !state.players.some((player) => player.turns) && !state.dice.length ? UI_TIMING.openingRollRevealMs : UI_TIMING.computerTurnStartMs;
+  computerBusy = true; render(); await pause(openingDelay);
   while (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
     if (state.awaitingNextTurn || !state.dice.length) {
       state = matchRoll(state); render();
@@ -195,17 +217,21 @@ function renderMatchResult() {
   $("#win-copy").innerHTML = `<p class="result-label">Final score</p><div class="result-scores">${state.players.map((player) => `<div class="${state.winners.includes(player.id) ? "winner" : ""}"><span>${player.name}</span><strong>${player.score.toLocaleString()}</strong></div>`).join("")}</div>`;
 }
 
+function beginComputerTurnIfNeeded() {
+  if (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") scheduleComputerTurn();
+}
+
 $("#dice").addEventListener("click", (event) => { const button = event.target.closest("[data-die]"); if (button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleSelection(state, Number(button.dataset.die)); render(); } });
 $("#combo-actions").addEventListener("click", (event) => { const button = event.target.closest("[data-triple]"); if (button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleTriple(state, Number(button.dataset.triple)); render(); } });
 $("#roll").addEventListener("click", doRoll);
 $("#bank").addEventListener("click", doBank);
-$("#restart").addEventListener("click", () => { if (confirm("Abandon this game and start again?")) { stats.abandoned += 1; saveStats(stats); state = state.mode === "computer" ? createComputerMatch() : { ...createGame(), mode: "practice" }; computerBusy = false; render(); } });
-$("#new-game").addEventListener("click", () => { $("#win").close(); state = state.mode === "computer" ? createComputerMatch() : { ...createGame(), mode: "practice" }; render(); });
+$("#restart").addEventListener("click", () => { if (confirm("Abandon this game and start again?")) { stats.abandoned += 1; saveStats(stats); state = state.mode === "computer" ? createComputerMatch() : { ...createGame(), mode: "practice" }; computerBusy = false; render(); beginComputerTurnIfNeeded(); } });
+$("#new-game").addEventListener("click", () => { $("#win").close(); state = state.mode === "computer" ? createComputerMatch() : { ...createGame(), mode: "practice" }; render(); beginComputerTurnIfNeeded(); });
 document.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => {
   if (button.dataset.mode === (state.mode || "practice")) return;
   if ((state.dice.length || state.totalScore) && !confirm("Start a new game in this mode?")) return;
   state = button.dataset.mode === "computer" ? createComputerMatch() : { ...createGame(), mode: "practice" };
-  computerBusy = false; render();
+  computerBusy = false; render(); beginComputerTurnIfNeeded();
 }));
 document.addEventListener("click", (event) => { if (event.target.dataset.open) { if (event.target.dataset.open === "stats") renderStats(); $(`#${event.target.dataset.open}`).showModal(); } if (event.target.dataset.close) $(`#${event.target.dataset.close}`).close(); });
 $("#scoring-help").addEventListener("change", (event) => { prefs.scoringHelp = event.target.checked; savePrefs(prefs); render(); });
@@ -222,6 +248,6 @@ $("#scoring-help").checked = prefs.scoringHelp;
 render();
 if (!prefs.introSeen) { $("#intro").showModal(); prefs.introSeen = true; savePrefs(prefs); }
 if (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
-  showTurnIndicator();
+  if (state.players.some((player) => player.turns) || state.dice.length) showTurnIndicator();
   scheduleComputerTurn();
 }

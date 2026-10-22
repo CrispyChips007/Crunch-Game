@@ -1,14 +1,24 @@
 import { GAME_CONFIG } from "./config.js";
 import { bank, createGame, roll } from "./engine.js";
+import { secureDie } from "./random.js";
 
-export function createComputerMatch(config = GAME_CONFIG) {
+export function rollForStarter(dieRoller = secureDie) {
+  const rolls = [];
+  do rolls.push([dieRoller(), dieRoller()]); while (rolls.at(-1)[0] === rolls.at(-1)[1]);
+  return { rolls, startingPlayer: rolls.at(-1)[0] > rolls.at(-1)[1] ? 0 : 1 };
+}
+
+export function createComputerMatch(config = GAME_CONFIG, dieRoller = secureDie) {
+  const openingRoll = rollForStarter(dieRoller);
+  const starterName = openingRoll.startingPlayer === 0 ? "You start." : "Crunchy starts.";
   return {
-    ...createGame(config), mode: "computer", round: 1, activePlayer: 0,
+    ...createGame(config), mode: "computer", round: 1, activePlayer: openingRoll.startingPlayer,
+    startingPlayer: openingRoll.startingPlayer, openingRolls: openingRoll.rolls,
     players: [
       { id: "human", name: "You", score: 0, opened: false, turns: 0, crunchStreak: 0 },
       { id: "computer", name: "Crunchy", score: 0, opened: false, turns: 0, crunchStreak: 0 },
     ],
-    message: "Your turn. Roll the dice.",
+    message: `Opening high roll: ${starterName}`,
   };
 }
 
@@ -31,7 +41,7 @@ function finishTurn(state) {
     return { ...state, players, status: "finished", winners, draw: winners.length > 1, selected: [], turnScore: 0, retainedCount: 0, awaitingNextTurn: false, message: winners.length > 1 ? "It's a draw!" : winner.id === "human" ? "You win!" : `${winner.name} wins!` };
   }
   const activePlayer = state.activePlayer === 0 ? 1 : 0;
-  const round = activePlayer === 0 ? state.round + 1 : state.round;
+  const round = activePlayer === state.startingPlayer ? state.round + 1 : state.round;
   const next = players[activePlayer];
   const turnMessage = `${next.name === "You" ? "Your" : `${next.name}'s`} turn.`;
   return {

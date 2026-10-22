@@ -1,6 +1,7 @@
-const GAME_KEY = "crunch.game.v2";
+const GAME_KEY = "crunch.game.v3";
 const STATS_KEY = "crunch.stats.v1";
 const PREFS_KEY = "crunch.prefs.v1";
+const BEST_RUN_KEY = "crunch.best-run.v1";
 
 export const DEFAULT_STATS = Object.freeze({ version: 1, completed: 0, won: 0, lost: 0, abandoned: 0, highestBank: 0, fewestTurns: null, crunches: 0 });
 export const DEFAULT_PREFS = Object.freeze({ scoringHelp: false, introSeen: false });
@@ -32,6 +33,14 @@ export function savePrefs(prefs, storage = localStorage) { storage.setItem(PREFS
 export function saveGame(game, storage = localStorage) { storage.setItem(GAME_KEY, encode(game)); }
 export function loadGame(storage = localStorage) { return decode(storage.getItem(GAME_KEY), null); }
 export function clearGame(storage = localStorage) { storage.removeItem(GAME_KEY); }
+export function loadBestRun(storage = localStorage) { return decode(storage.getItem(BEST_RUN_KEY), null); }
+export function saveBestRun(bestRun, storage = localStorage) { storage.setItem(BEST_RUN_KEY, encode(bestRun)); }
+
+export function betterBestRun(current, scores) {
+  const candidate = { turns: scores.length, finalScore: scores.at(-1) ?? 0, scores: [...scores] };
+  if (!current || candidate.turns < current.turns || (candidate.turns === current.turns && candidate.finalScore > current.finalScore)) return candidate;
+  return current;
+}
 
 export function recordCrunch(stats) { return { ...stats, crunches: stats.crunches + 1 }; }
 export function recordBank(stats, points) { return { ...stats, highestBank: Math.max(stats.highestBank, points) }; }

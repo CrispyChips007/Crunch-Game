@@ -1,9 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { bestComputerSelection, chooseComputerAction, chooseComputerSelection, maximumComputerSelection } from "../src/computer.js";
-import { createComputerMatch, matchBank, matchRoll } from "../src/match.js";
+import { createComputerMatch, matchBank, matchRoll, rollForStarter } from "../src/match.js";
 
 const roller = (values) => { let i=0; return () => values[i++]; };
+const humanStartsMatch = () => createComputerMatch(undefined, roller([6,1]));
+test("opening high roll chooses the starter and rerolls ties", () => {
+  const result=rollForStarter(roller([3,3,2,5]));
+  assert.deepEqual(result.rolls,[[3,3],[2,5]]);
+  assert.equal(result.startingPlayer,1);
+  const state=createComputerMatch(undefined,roller([2,6]));
+  assert.equal(state.activePlayer,1);
+  assert.match(state.message,/Crunchy starts/);
+});
+test("round numbering follows the opening-roll winner", () => {
+  let state=createComputerMatch(undefined,roller([1,6]));
+  state=matchRoll(state,roller([2,3,4,6,2]));
+  assert.equal(state.activePlayer,0);
+  assert.equal(state.round,1);
+  state=matchRoll(state,roller([2,3,4,6,2]));
+  assert.equal(state.activePlayer,1);
+  assert.equal(state.round,2);
+});
 test("computer cannot bank below its opening threshold", () => {
   assert.equal(chooseComputerAction({opened:false,unbankedPoints:950,diceRemaining:1,totalScore:0,opponentScore:0}),"roll");
   assert.equal(chooseComputerAction({opened:false,unbankedPoints:1000,diceRemaining:1,totalScore:0,opponentScore:0}),"bank");
@@ -39,14 +57,14 @@ test("computer takes all points that satisfy its opening requirement", () => {
   assert.deepEqual(chooseComputerSelection([1,5,3], { opened:false, turnScore:850 }), {indices:[0,1],score:150});
 });
 test("match alternates after a Crunch and preserves the roll", () => {
-  let state=createComputerMatch();
+  let state=humanStartsMatch();
   state=matchRoll(state,roller([2,3,4,6,2]));
   assert.equal(state.activePlayer,1);
   assert.equal(state.players[0].turns,1);
   assert.deepEqual(state.dice,[2,3,4,6,2]);
 });
 test("match tracks each player's Crunch streak and resets only that player's score", () => {
-  let state={...createComputerMatch(),players:[{id:'human',name:'You',score:2400,opened:true,turns:2,crunchStreak:2},{id:'computer',name:'Crunchy',score:1800,opened:true,turns:2,crunchStreak:1}],totalScore:2400,opened:true,crunchStreak:2};
+  let state={...humanStartsMatch(),players:[{id:'human',name:'You',score:2400,opened:true,turns:2,crunchStreak:2},{id:'computer',name:'Crunchy',score:1800,opened:true,turns:2,crunchStreak:1}],totalScore:2400,opened:true,crunchStreak:2};
   state=matchRoll(state,roller([2,3,4,6,2]));
   assert.equal(state.players[0].score,0);
   assert.equal(state.players[0].crunchStreak,0);
@@ -56,7 +74,7 @@ test("match tracks each player's Crunch streak and resets only that player's sco
   assert.match(state.message,/You crunched back to zero/i);
 });
 test("match bank updates player and passes the turn", () => {
-  let state={...createComputerMatch(),turnScore:900,dice:[1],selected:[0]};
+  let state={...humanStartsMatch(),turnScore:900,dice:[1],selected:[0]};
   state=matchBank(state);
   assert.equal(state.players[0].score,1000);
   assert.equal(state.activePlayer,1);
@@ -64,7 +82,7 @@ test("match bank updates player and passes the turn", () => {
   assert.equal(state.awaitingNextTurn,true);
 });
 test("target waits for equal turns before completing", () => {
-  let state={...createComputerMatch(),players:[{id:'human',name:'You',score:9900,opened:true,turns:3},{id:'computer',name:'Computer',score:9000,opened:true,turns:3}],totalScore:9900,opened:true,turnScore:0,dice:[1],selected:[0]};
+  let state={...humanStartsMatch(),players:[{id:'human',name:'You',score:9900,opened:true,turns:3},{id:'computer',name:'Computer',score:9000,opened:true,turns:3}],totalScore:9900,opened:true,turnScore:0,dice:[1],selected:[0]};
   state=matchBank(state);
   assert.equal(state.status,'playing');
   assert.equal(state.activePlayer,1);

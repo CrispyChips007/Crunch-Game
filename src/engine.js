@@ -5,7 +5,7 @@ import { rollDice } from "./random.js";
 export function createGame(config = GAME_CONFIG) {
   return {
     version: 2, totalScore: 0, turnScore: 0, retainedCount: 0,
-    dice: [], selected: [], turnCount: 1, opened: false, crunchStreak: 0,
+    dice: [], selected: [], turnCount: 1, opened: false, crunchStreak: 0, scoreHistory: [],
     status: "playing", message: "Roll the dice to begin.", config,
   };
 }

@@ -34,6 +34,7 @@
       <div id="turn-indicator" class="turn-indicator" aria-hidden="true"><strong></strong></div>
       <h1 id="game-heading" class="sr-only">Crunch dice game</h1>
       <div class="mode-switch" aria-label="Game mode"><button data-mode="computer" class="active">Vs Crunchy</button><button data-mode="practice">Practice</button></div>
+      <div id="opening-roll" class="opening-roll" hidden></div>
       <div id="players" class="players" hidden></div>
       <div class="scoreboard">
         <div><span id="score-label">Target</span><strong id="score-value">10,000</strong></div>
@@ -81,9 +82,11 @@
     </div>
     <ul class="rule-notes">
       <li>To add points to your total for the first time, you must earn and Bank at least <b>1,000 points in one turn</b>. After that, you may Bank any amount.</li>
-      <li>A roll with no scoring dice is a <b>Crunch</b>. You lose every unbanked point from that turn.</li>
-      <li>After you have opened, <b>three consecutive Crunches</b> reset your total score to zero. Banking any score clears the count, and you stay Open after a reset.</li>
       <li>If all five dice score, you may roll again with all five dice.</li>
+      <li>A roll with no scoring dice is a <b>Crunch</b>. You lose every unbanked point from that turn.</li>
+      <li>Once you’ve banked points, watch out: <b>three Crunches in a row wipe your total back to zero.</b> Bank to break the streak. The 1,000-point minimum does not return.</li>
+      <li>In Vs Crunchy, both players make a high roll at the start. The higher die goes first; ties roll again.</li>
+      <li>Practice mode races your score against the pace of your best completed game.</li>
     </ul>
     <label class="toggle"><input id="scoring-help" type="checkbox"> Show subtle scoring hints</label>
     <button class="secondary" data-close="how">Close</button>
