@@ -29,6 +29,7 @@ let bestRun = loadBestRun();
 let computerBusy = false;
 let crunchMeterOverride = null;
 let pendingCrunchStreak = null;
+let pendingCrunchMessage = "";
 let crunchMarkSlam = false;
 const crunchHandoffDelay = UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs + UI_TIMING.crunchSettleMs;
 
@@ -98,7 +99,11 @@ function doRoll() {
   const previousCrunchStreak = state.mode === "computer" ? (state.players[beforePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0);
   state = state.mode === "computer" ? matchRoll(state) : roll(state);
   const crunched = state.lastEvent === "crunch" || state.lastEvent === "triple-crunch";
-  if (crunched) prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : (state.mode === "computer" ? state.players[beforePlayer].crunchStreak : state.crunchStreak));
+  if (crunched) prepareCrunchMeter(
+    previousCrunchStreak,
+    state.lastEvent === "triple-crunch" ? 3 : (state.mode === "computer" ? state.players[beforePlayer].crunchStreak : state.crunchStreak),
+    state.lastEvent === "triple-crunch" ? `${state.mode === "computer" ? state.players[beforePlayer].name.toUpperCase() : "YOU"} CRUNCHED BACK TO ZERO` : "",
+  );
   if (state.mode === "practice" && crunched) state = { ...state, scoreHistory: [...(state.scoreHistory ?? []), state.totalScore] };
   if (crunched) { stats = recordCrunch(stats); saveStats(stats); }
   render();
@@ -121,6 +126,7 @@ function playCrunchEffect() {
   const card = $(".game-card");
   const effect = $("#crunch-effect");
   const effectText = effect.querySelector("strong");
+  $("#crunch-message").textContent = pendingCrunchMessage;
   const targetMark = $("#crunch-count .crunch-mark:last-child");
   card.classList.remove("is-crunching");
   effect.classList.remove("active");
@@ -143,15 +149,17 @@ function playCrunchEffect() {
   }, { once: true });
 }
 
-function prepareCrunchMeter(previousStreak, nextStreak) {
+function prepareCrunchMeter(previousStreak, nextStreak, message = "") {
   crunchMeterOverride = previousStreak;
   pendingCrunchStreak = nextStreak;
+  pendingCrunchMessage = message;
   crunchMarkSlam = false;
 }
 
 function clearCrunchMeterOverride() {
   crunchMeterOverride = null;
   pendingCrunchStreak = null;
+  pendingCrunchMessage = "";
   crunchMarkSlam = false;
   render();
 }
@@ -235,7 +243,7 @@ async function scheduleComputerTurn() {
       const previousCrunchStreak = state.players[1].crunchStreak ?? 0;
       state = matchRoll(state); render();
       if (state.activePlayer !== 1) {
-        prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak);
+        prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak, state.lastEvent === "triple-crunch" ? "CRUNCHY CRUNCHED BACK TO ZERO" : "");
         render();
         await pause(UI_TIMING.crunchRevealMs);
         playCrunchEffect();
@@ -265,7 +273,7 @@ async function scheduleComputerTurn() {
     const previousCrunchStreak = state.players[1].crunchStreak ?? 0;
     state = matchRoll(state); render();
     if (state.activePlayer !== 1) {
-      prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak);
+      prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak, state.lastEvent === "triple-crunch" ? "CRUNCHY CRUNCHED BACK TO ZERO" : "");
       render();
       await pause(UI_TIMING.crunchRevealMs);
       playCrunchEffect();
