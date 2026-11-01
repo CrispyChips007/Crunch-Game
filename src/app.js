@@ -32,6 +32,7 @@ let pendingCrunchStreak = null;
 let pendingCrunchMessage = "";
 let crunchMarkSlam = false;
 let crunchBusy = false;
+let resetMessageShown = false;
 let turnIndicatorBusy = false;
 let visualActivePlayer = null;
 let visualRound = null;
@@ -173,7 +174,8 @@ function playCrunchEffect() {
 }
 
 function showCrunchResetMessage() {
-  if (!pendingCrunchMessage) return;
+  if (!pendingCrunchMessage || resetMessageShown) return;
+  resetMessageShown = true;
   const indicator = $("#crunch-reset-indicator");
   indicator.querySelector("strong").textContent = `OH NO! ${pendingCrunchMessage}`;
   indicator.setAttribute("aria-hidden", "false");
@@ -190,6 +192,7 @@ function hideCrunchResetMessage() {
 
 function prepareCrunchMeter(previousStreak, nextStreak, message = "") {
   crunchBusy = true;
+  resetMessageShown = false;
   crunchMeterOverride = previousStreak;
   pendingCrunchStreak = nextStreak;
   pendingCrunchMessage = message;
