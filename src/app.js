@@ -32,12 +32,10 @@ let pendingCrunchStreak = null;
 let pendingCrunchMessage = "";
 let crunchMarkSlam = false;
 let crunchBusy = false;
-let resetMessageShown = false;
 let turnIndicatorBusy = false;
 let visualActivePlayer = null;
 let visualRound = null;
 let muteCrunchyDice = state.mode === "computer" && state.activePlayer === 0 && state.awaitingNextTurn && state.dice?.length > 0;
-const crunchHandoffDelay = (showResetMessage) => UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs + UI_TIMING.crunchSettleMs + (showResetMessage ? UI_TIMING.crunchResetMessageMs : 0);
 
 function rankFor(completed) { return RANKS.find(([threshold]) => completed >= threshold)[1]; }
 function dots(face) { return Array.from({ length: face }, () => "<i></i>").join(""); }
@@ -127,19 +125,17 @@ function doRoll() {
   if (state.mode === "practice" && crunched) state = { ...state, scoreHistory: [...(state.scoreHistory ?? []), state.totalScore] };
   if (crunched) { stats = recordCrunch(stats); saveStats(stats); }
   render();
-  if (crunched) setTimeout(playCrunchEffect, UI_TIMING.crunchRevealMs);
-  if (resetToZero) setTimeout(showCrunchResetMessage, UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs);
-  if (state.mode === "computer" && state.activePlayer !== beforePlayer && state.status === "playing") {
-    const completeHandoff = () => showTurnIndicator(() => {
-      if (state.activePlayer === 1) scheduleComputerTurn();
-    });
-    if (crunched) setTimeout(() => { clearCrunchMeterOverride(); hideCrunchResetMessage(); completeHandoff(); }, crunchHandoffDelay(resetToZero));
-    else completeHandoff();
-  }
-  if (state.mode === "practice" && crunched) setTimeout(() => { clearCrunchMeterOverride(); hideCrunchResetMessage(); }, crunchHandoffDelay(resetToZero));
-  if (state.mode === "computer" && state.status === "finished") {
-    setTimeout(() => { clearCrunchMeterOverride(); hideCrunchResetMessage(); showMatchResult(); }, crunched ? crunchHandoffDelay(resetToZero) : 0);
-  }
+  const completeHandoff = () => {
+    if (state.mode === "computer" && state.status === "finished") {
+      showMatchResult();
+    } else if (state.mode === "computer" && state.activePlayer !== beforePlayer) {
+      showTurnIndicator(() => {
+        if (state.activePlayer === 1) scheduleComputerTurn();
+      });
+    }
+  };
+  if (crunched) runCrunchSequence(resetToZero).then(completeHandoff);
+  else completeHandoff();
 }
 
 function playCrunchEffect() {
@@ -174,8 +170,7 @@ function playCrunchEffect() {
 }
 
 function showCrunchResetMessage() {
-  if (!pendingCrunchMessage || resetMessageShown) return;
-  resetMessageShown = true;
+  if (!pendingCrunchMessage) return;
   const indicator = $("#crunch-reset-indicator");
   indicator.querySelector("strong").textContent = `OH NO! ${pendingCrunchMessage}`;
   indicator.setAttribute("aria-hidden", "false");
@@ -192,11 +187,23 @@ function hideCrunchResetMessage() {
 
 function prepareCrunchMeter(previousStreak, nextStreak, message = "") {
   crunchBusy = true;
-  resetMessageShown = false;
   crunchMeterOverride = previousStreak;
   pendingCrunchStreak = nextStreak;
   pendingCrunchMessage = message;
   crunchMarkSlam = false;
+}
+
+async function runCrunchSequence(resetToZero) {
+  await pause(UI_TIMING.crunchRevealMs);
+  playCrunchEffect();
+  await pause(UI_TIMING.crunchAnimationMs);
+  if (resetToZero) {
+    showCrunchResetMessage();
+    await pause(UI_TIMING.crunchResetMessageMs);
+    hideCrunchResetMessage();
+  }
+  await pause(UI_TIMING.crunchSettleMs);
+  clearCrunchMeterOverride();
 }
 
 function clearCrunchMeterOverride() {
@@ -315,16 +322,7 @@ async function scheduleComputerTurn() {
       if (state.activePlayer !== 1) {
         prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak, state.lastEvent === "triple-crunch" ? "CRUNCHY CRUNCHED BACK TO ZERO" : "");
         render();
-        await pause(UI_TIMING.crunchRevealMs);
-        playCrunchEffect();
-        await pause(UI_TIMING.crunchAnimationMs);
-        if (state.lastEvent === "triple-crunch") {
-          showCrunchResetMessage();
-          await pause(UI_TIMING.crunchResetMessageMs);
-          hideCrunchResetMessage();
-        }
-        await pause(UI_TIMING.crunchSettleMs);
-        clearCrunchMeterOverride();
+        await runCrunchSequence(state.lastEvent === "triple-crunch");
         showTurnIndicator();
         break;
       }
@@ -366,16 +364,7 @@ async function scheduleComputerTurn() {
     if (state.activePlayer !== 1) {
       prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak, state.lastEvent === "triple-crunch" ? "CRUNCHY CRUNCHED BACK TO ZERO" : "");
       render();
-      await pause(UI_TIMING.crunchRevealMs);
-      playCrunchEffect();
-      await pause(UI_TIMING.crunchAnimationMs);
-      if (state.lastEvent === "triple-crunch") {
-        showCrunchResetMessage();
-        await pause(UI_TIMING.crunchResetMessageMs);
-        hideCrunchResetMessage();
-      }
-      await pause(UI_TIMING.crunchSettleMs);
-      clearCrunchMeterOverride();
+      await runCrunchSequence(state.lastEvent === "triple-crunch");
       showTurnIndicator();
       break;
     }
