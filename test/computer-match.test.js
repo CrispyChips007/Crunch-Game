@@ -92,3 +92,24 @@ test("target waits for equal turns before completing", () => {
   assert.equal(state.status,'finished');
   assert.deepEqual(state.winners,['human']);
 });
+test("balancing-turn Crunch finishes a match won by the opening player", () => {
+  let state={
+    ...createComputerMatch(undefined,roller([1,6])),
+    openingRevealed:true,
+    activePlayer:0,
+    players:[
+      {id:'human',name:'You',score:8200,opened:true,turns:3,crunchStreak:0},
+      {id:'computer',name:'Crunchy',score:10400,opened:true,turns:4,crunchStreak:0},
+    ],
+    totalScore:8200,
+    opened:true,
+    dice:[],
+    selected:[],
+    awaitingNextTurn:false,
+  };
+  state=matchRoll(state,roller([2,3,4,6,2]));
+  assert.equal(state.status,'finished');
+  assert.deepEqual(state.winners,['computer']);
+  assert.equal(state.players[0].turns,4);
+  assert.match(state.message,/Crunchy wins/);
+});

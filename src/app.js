@@ -32,6 +32,9 @@ let pendingCrunchStreak = null;
 let pendingCrunchMessage = "";
 let crunchMarkSlam = false;
 let crunchBusy = false;
+let turnIndicatorBusy = false;
+let visualActivePlayer = null;
+let visualRound = null;
 let muteCrunchyDice = state.mode === "computer" && state.activePlayer === 0 && state.awaitingNextTurn && state.dice?.length > 0;
 const crunchHandoffDelay = (showResetMessage) => UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs + UI_TIMING.crunchSettleMs + (showResetMessage ? UI_TIMING.crunchResetMessageMs : 0);
 
@@ -45,21 +48,22 @@ function crunchMark(slam) {
 
 function render() {
   const isComputerMatch = state.mode === "computer";
+  const displayedPlayer = visualActivePlayer ?? state.activePlayer;
   const humanScore = isComputerMatch ? state.players[0].score : state.totalScore;
   $("#score-label").textContent = "Target";
   $("#score-value").textContent = state.config.winningTarget.toLocaleString();
-  const activeCrunchStreak = crunchMeterOverride ?? (isComputerMatch ? (state.players[state.activePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0));
+  const activeCrunchStreak = crunchMeterOverride ?? (isComputerMatch ? (state.players[displayedPlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0));
   $("#crunch-count").innerHTML = Array.from({ length: activeCrunchStreak }, (_, index) => crunchMark(crunchMarkSlam && index === activeCrunchStreak - 1)).join("");
   $(".crunch-meter").setAttribute("aria-label", `${activeCrunchStreak} consecutive ${activeCrunchStreak === 1 ? "Crunch" : "Crunches"}`);
   $("#turn-label").textContent = isComputerMatch ? "Round" : "Turn";
-  $("#turn-count").textContent = isComputerMatch ? state.round : state.turnCount;
+  $("#turn-count").textContent = isComputerMatch ? (visualRound ?? state.round) : state.turnCount;
   document.querySelectorAll("[data-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === (state.mode || "practice"));
-    button.disabled = computerBusy || crunchBusy;
+    button.disabled = computerBusy || crunchBusy || turnIndicatorBusy;
   });
   $("#players").hidden = false;
   if (isComputerMatch) {
-    $("#players").innerHTML = state.players.map((player, index) => `<div class="player-chip${state.openingRevealed && index === state.activePlayer ? " active" : ""}"><span>${player.name}</span><strong>${player.score.toLocaleString()}</strong><small>${player.opened ? "Bank any score" : "Needs 1,000"}</small></div>`).join("");
+    $("#players").innerHTML = state.players.map((player, index) => `<div class="player-chip${state.openingRevealed && index === displayedPlayer ? " active" : ""}"><span>${player.name}</span><strong>${player.score.toLocaleString()}</strong><small>${player.opened ? "Bank any score" : "Needs 1,000"}</small></div>`).join("");
   } else {
     const completedTurns = state.scoreHistory?.length ?? 0;
     const ghostScore = bestRun ? (bestRun.scores[completedTurns - 1] ?? (completedTurns >= bestRun.turns ? bestRun.finalScore : 0)) : null;
@@ -71,7 +75,7 @@ function render() {
   $("#selection-score").textContent = selectedScore ? `${selectedScore.toLocaleString()} from selected dice` : "No dice selected";
   $("#message").textContent = state.message;
   const scoring = new Set(scoringOptions(state.dice).flatMap((option) => option.indices));
-  const canSelectDice = state.status === "playing" && !state.awaitingNextTurn && (!isComputerMatch || state.activePlayer === 0) && !computerBusy && !crunchBusy;
+  const canSelectDice = state.status === "playing" && !state.awaitingNextTurn && (!isComputerMatch || state.activePlayer === 0) && !computerBusy && !crunchBusy && !turnIndicatorBusy;
   const diceOwner = isComputerMatch && state.dice.length
     ? (state.awaitingNextTurn ? (state.activePlayer === 0 ? 1 : 0) : state.activePlayer)
     : 0;
@@ -89,24 +93,29 @@ function render() {
   $(".controls").classList.toggle("choice-ready", bankable);
   const waitingToStart = isComputerMatch && !state.openingRevealed;
   const humanTurn = !isComputerMatch || state.activePlayer === 0 || waitingToStart;
-  $("#bank").disabled = !bankable || !humanTurn || computerBusy || crunchBusy;
+  $("#bank").disabled = !bankable || !humanTurn || computerBusy || crunchBusy || turnIndicatorBusy;
   $("#bank").title = actionable && !meetsOpeningRequirement ? `You need ${state.config.openingRequirement.toLocaleString()} points to open.` : "";
-  $("#roll").disabled = !humanTurn || computerBusy || crunchBusy || Boolean(state.dice.length && !actionable && !state.awaitingNextTurn);
+  $("#roll").disabled = !humanTurn || computerBusy || crunchBusy || turnIndicatorBusy || Boolean(state.dice.length && !actionable && !state.awaitingNextTurn);
   $("#roll").textContent = waitingToStart ? "Start game" : (state.awaitingNextTurn ? "Roll dice" : (state.dice.length ? "Roll again" : "Roll dice"));
   if (state.status === "playing" && hasGameProgress(state)) saveGame(state);
-  else if (state.status === "playing") clearGame();
+  else clearGame();
 }
 
 function doRoll() {
-  if (crunchBusy || computerBusy) return;
+  if (crunchBusy || computerBusy || turnIndicatorBusy) return;
   if (state.mode === "computer" && !state.openingRevealed) {
     showOpeningRollSequence();
     return;
   }
   muteCrunchyDice = false;
   const beforePlayer = state.activePlayer;
+  const beforeRound = state.round;
   const previousCrunchStreak = state.mode === "computer" ? (state.players[beforePlayer].crunchStreak ?? 0) : (state.crunchStreak ?? 0);
   state = state.mode === "computer" ? matchRoll(state) : roll(state);
+  if (state.mode === "computer" && state.activePlayer !== beforePlayer) {
+    visualActivePlayer = beforePlayer;
+    visualRound = beforeRound;
+  }
   const crunched = state.lastEvent === "crunch" || state.lastEvent === "triple-crunch";
   const resetToZero = state.lastEvent === "triple-crunch";
   if (crunched) prepareCrunchMeter(
@@ -120,12 +129,16 @@ function doRoll() {
   if (crunched) setTimeout(playCrunchEffect, UI_TIMING.crunchRevealMs);
   if (resetToZero) setTimeout(showCrunchResetMessage, UI_TIMING.crunchRevealMs + UI_TIMING.crunchAnimationMs);
   if (state.mode === "computer" && state.activePlayer !== beforePlayer && state.status === "playing") {
-    if (crunched) setTimeout(() => { clearCrunchMeterOverride(); hideCrunchResetMessage(); showTurnIndicator(); }, crunchHandoffDelay(resetToZero)); else showTurnIndicator();
-  }
-  if (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
-    if (crunched) setTimeout(scheduleComputerTurn, crunchHandoffDelay(resetToZero)); else scheduleComputerTurn();
+    const completeHandoff = () => showTurnIndicator(() => {
+      if (state.activePlayer === 1) scheduleComputerTurn();
+    });
+    if (crunched) setTimeout(() => { clearCrunchMeterOverride(); hideCrunchResetMessage(); completeHandoff(); }, crunchHandoffDelay(resetToZero));
+    else completeHandoff();
   }
   if (state.mode === "practice" && crunched) setTimeout(() => { clearCrunchMeterOverride(); hideCrunchResetMessage(); }, crunchHandoffDelay(resetToZero));
+  if (state.mode === "computer" && state.status === "finished") {
+    setTimeout(() => { clearCrunchMeterOverride(); hideCrunchResetMessage(); showMatchResult(); }, crunched ? crunchHandoffDelay(resetToZero) : 0);
+  }
 }
 
 function playCrunchEffect() {
@@ -192,17 +205,25 @@ function clearCrunchMeterOverride() {
   render();
 }
 
-function showTurnIndicator() {
+function showTurnIndicator(onComplete) {
   const indicator = $("#turn-indicator");
   const player = state.players?.[state.activePlayer];
   if (!player) return;
+  turnIndicatorBusy = true;
   muteCrunchyDice = player.id === "human" && state.awaitingNextTurn && state.dice.length > 0;
   render();
   indicator.querySelector("strong").textContent = player.id === "human" ? "YOUR TURN" : `${player.name.toUpperCase()}'S\nTURN`;
   indicator.classList.remove("active");
   void indicator.offsetWidth;
   indicator.classList.add("active");
-  indicator.addEventListener("animationend", () => indicator.classList.remove("active"), { once: true });
+  indicator.addEventListener("animationend", () => {
+    indicator.classList.remove("active");
+    visualActivePlayer = null;
+    visualRound = null;
+    turnIndicatorBusy = false;
+    render();
+    onComplete?.();
+  }, { once: true });
 }
 
 async function showOpeningRollSequence() {
@@ -233,10 +254,15 @@ async function showOpeningRollSequence() {
 }
 
 function doBank() {
-  if (crunchBusy || computerBusy) return;
+  if (crunchBusy || computerBusy || turnIndicatorBusy) return;
   const previous = state;
   const beforePlayer = state.activePlayer;
+  const beforeRound = state.round;
   state = state.mode === "computer" ? matchBank(state) : bank(state);
+  if (state.mode === "computer" && state.activePlayer !== beforePlayer) {
+    visualActivePlayer = beforePlayer;
+    visualRound = beforeRound;
+  }
   if (state.mode === "practice" && state.lastEvent === "bank") state = { ...state, scoreHistory: [...(state.scoreHistory ?? []), state.totalScore] };
   if (state.lastBanked && state.lastBanked !== previous.lastBanked) stats = recordBank(stats, state.lastBanked);
   if (state.status === "won" || state.status === "finished") {
@@ -260,20 +286,29 @@ function doBank() {
     $("#win").showModal();
   } else saveStats(stats);
   render();
-  if (state.mode === "computer" && state.activePlayer !== beforePlayer && state.status === "playing") showTurnIndicator();
-  if (state.mode === "computer" && state.activePlayer === 1) scheduleComputerTurn();
+  if (state.mode === "computer" && state.activePlayer !== beforePlayer && state.status === "playing") {
+    showTurnIndicator(() => {
+      if (state.activePlayer === 1) scheduleComputerTurn();
+    });
+  }
 }
 
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 async function scheduleComputerTurn() {
-  if (computerBusy || state.mode !== "computer" || state.activePlayer !== 1 || state.status !== "playing") return;
+  if (computerBusy || turnIndicatorBusy || state.mode !== "computer" || state.activePlayer !== 1 || state.status !== "playing") return;
   const openingDelay = UI_TIMING.computerTurnStartMs;
   computerBusy = true; render(); await pause(openingDelay);
   while (state.mode === "computer" && state.activePlayer === 1 && state.status === "playing") {
     if (state.awaitingNextTurn || !state.dice.length) {
       muteCrunchyDice = false;
       const previousCrunchStreak = state.players[1].crunchStreak ?? 0;
-      state = matchRoll(state); render();
+      const previousRound = state.round;
+      state = matchRoll(state);
+      if (state.activePlayer !== 1) {
+        visualActivePlayer = 1;
+        visualRound = previousRound;
+      }
+      render();
       if (state.activePlayer !== 1) {
         prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak, state.lastEvent === "triple-crunch" ? "CRUNCHY CRUNCHED BACK TO ZERO" : "");
         render();
@@ -306,11 +341,25 @@ async function scheduleComputerTurn() {
         render();
         await pause(UI_TIMING.computerSelectionPauseMs);
       }
-      state = matchBank(state); render(); showTurnIndicator(); break;
+      const previousRound = state.round;
+      state = matchBank(state);
+      if (state.status === "playing" && state.activePlayer !== 1) {
+        visualActivePlayer = 1;
+        visualRound = previousRound;
+      }
+      render();
+      if (state.status === "playing") showTurnIndicator();
+      break;
     }
     const previousCrunchStreak = state.players[1].crunchStreak ?? 0;
+    const previousRound = state.round;
     muteCrunchyDice = false;
-    state = matchRoll(state); render();
+    state = matchRoll(state);
+    if (state.activePlayer !== 1) {
+      visualActivePlayer = 1;
+      visualRound = previousRound;
+    }
+    render();
     if (state.activePlayer !== 1) {
       prepareCrunchMeter(previousCrunchStreak, state.lastEvent === "triple-crunch" ? 3 : state.players[1].crunchStreak, state.lastEvent === "triple-crunch" ? "CRUNCHY CRUNCHED BACK TO ZERO" : "");
       render();
@@ -350,8 +399,8 @@ function beginComputerTurnIfNeeded() {
   if (state.mode === "computer" && state.openingRevealed && state.activePlayer === 1 && state.status === "playing") scheduleComputerTurn();
 }
 
-$("#dice").addEventListener("click", (event) => { const button = event.target.closest("[data-die]"); if (!crunchBusy && !computerBusy && button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleSelection(state, Number(button.dataset.die)); render(); } });
-$("#combo-actions").addEventListener("click", (event) => { const button = event.target.closest("[data-triple]"); if (!crunchBusy && !computerBusy && button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleTriple(state, Number(button.dataset.triple)); render(); } });
+$("#dice").addEventListener("click", (event) => { const button = event.target.closest("[data-die]"); if (!crunchBusy && !computerBusy && !turnIndicatorBusy && button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleSelection(state, Number(button.dataset.die)); render(); } });
+$("#combo-actions").addEventListener("click", (event) => { const button = event.target.closest("[data-triple]"); if (!crunchBusy && !computerBusy && !turnIndicatorBusy && button && (!state.mode || state.mode === "practice" || state.activePlayer === 0)) { state = toggleTriple(state, Number(button.dataset.triple)); render(); } });
 $("#roll").addEventListener("click", doRoll);
 $("#bank").addEventListener("click", doBank);
 $("#restart").addEventListener("click", () => { if (confirm("Abandon this game and start again?")) { stats.abandoned += 1; saveStats(stats); state = state.mode === "computer" ? createComputerMatch() : { ...createGame(), mode: "practice" }; computerBusy = false; render(); beginComputerTurnIfNeeded(); } });
@@ -377,6 +426,6 @@ $("#scoring-help").checked = prefs.scoringHelp;
 render();
 if (!prefs.introSeen) { $("#intro").showModal(); prefs.introSeen = true; savePrefs(prefs); }
 if (state.mode === "computer" && state.openingRevealed && state.activePlayer === 1 && state.status === "playing") {
-  if (state.players.some((player) => player.turns) || state.dice.length) showTurnIndicator();
-  scheduleComputerTurn();
+  if (state.players.some((player) => player.turns) || state.dice.length) showTurnIndicator(scheduleComputerTurn);
+  else scheduleComputerTurn();
 }
